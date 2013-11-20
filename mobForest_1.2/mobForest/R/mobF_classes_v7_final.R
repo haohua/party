@@ -36,7 +36,10 @@ mobForest_control <- function(ntree = 300, mtry = 0, replace = FALSE,
   return(rval)
 }
 
-setClass("predictionOutput", representation(predMat = "matrix", R2 = "numeric", mse = "numeric", overallR2 = "numeric", predType = "character"), prototype = list(predMat = matrix(0,0,0), R2 = numeric(), mse = numeric(), overallR2 = numeric(), predType = character()))
+setClass("predictionOutput", 
+         representation(predMat = "matrix", R2 = "numeric", 
+                        mse = "numeric", overallR2 = "numeric",
+                        predType = "character"), prototype = list(predMat = matrix(0,0,0), R2 = numeric(), mse = numeric(), overallR2 = numeric(), predType = character()))
 prediction_output <- function(predMean = numeric(), predSd = numeric(), residual = numeric(), R2 = numeric(), mse = numeric(), overallR2 = numeric(), predType = character())
 {	
 	predMat = matrix(0, nrow=length(predMean), ncol=3)
@@ -67,7 +70,8 @@ setClass("mobForestOutput",
                         fam = "character",
                         train.response = "data.frame",
                         new.response = "data.frame", 
-                        mf.trees = 'list'
+                        mf.trees = 'list',
+                        mf.trees.prop  = 'list'
                         
                         ))
 mobForest_output <- function(oobPredictions, 
@@ -78,7 +82,8 @@ mobForest_output <- function(oobPredictions,
                              fam, 
                              train.response, 
                              new.response = data.frame(matrix(0,0,0)),
-                             mf.trees = list()
+                             mf.trees = list(),
+                             mf.trees.prop = list()
                              )
 {
 	rval <- new("mobForestOutput",
@@ -88,7 +93,8 @@ mobForest_output <- function(oobPredictions,
               VarimpObject = VarimpObject, modelUsed = modelUsed, 
               fam = fam, train.response = train.response,
               new.response = new.response, 
-	            mf.trees = mf.trees
+	            mf.trees = mf.trees, 
+	            mf.trees.prop = mf.trees.prop
               )
     return(rval)
 }
@@ -103,7 +109,7 @@ setMethod("show", "mobForestOutput", function(object) {
 
 setGeneric("getVarimp", function(object) standardGeneric("getVarimp"))
 setMethod("getVarimp", signature(object="mobForestOutput"), function(object) {
-	
+	# for a variable imporance matrix ( B * p), take the average over B trees for each splitting variable
 	rf <- object
 	varImp.scores <- apply((rf@VarimpObject)@varimpMatrix, 1, mean, na.rm=T)	
 	return(sort(varImp.scores, decreasing=T))
@@ -127,26 +133,36 @@ setMethod("varimplot", signature(object="mobForestOutput"), function(object) {
 })
 
 setGeneric("getPredictedValues", function(object, OOB = TRUE, newdata = FALSE, newTestData = as.data.frame(matrix(0,0,0))) standardGeneric("getPredictedValues"))
-setMethod("getPredictedValues", signature(object="mobForestOutput", OOB="ANY", newdata="ANY"), function(object, OOB, newdata, newTestData) {
+setMethod("getPredictedValues", 
+          signature(object="mobForestOutput", OOB="ANY", newdata="ANY"), 
+          function(object, OOB, newdata, newTestData) {
 	
-	#if(missing(object)) cat("This function expects object of 'mobForestOutput', returned by mobForestAnalysis(), as its first argument\n")
-	rf <- object	
-	if (nrow(rf@NewDataPredictions@predMat) == 0 && newdata == TRUE)
-		stop("Predicted values were only computed on original data. Please set newdata = FALSE and run the getPredictedValues() again. Or you can re-run the mobForestAnalysis() with 'newTestdata' parameter not missing and later use getPredictedValues() to get predicted values on the new test data.")
-	rval <- c()
-	if(newdata == FALSE)
-	{
-		if(OOB == TRUE)
-		{
-			rval <- (rf@oobPredictions)@predMat			
-		} else {
-			rval <- (rf@GeneralPredictions)@predMat
-		}
-	} else { # if there is new data, then do the outsample prediction
-		rval <- (rf@NewDataPredictions)@predMat		
-	}		
-	return(rval)
-})
+        	#if(missing(object)) cat("This function expects object of 'mobForestOutput', returned by mobForestAnalysis(), as its first argument\n")
+        	rf <- object	
+        	if (nrow(rf@NewDataPredictions@predMat) == 0 && newdata == TRUE
+              &&nrow(newTestData) == 0 )
+        		stop("Predicted values were only computed on original data. Please set newdata = FALSE and run the getPredictedValues() again. Or you can re-run the mobForestAnalysis() with 'newTestdata' parameter not missing and later use getPredictedValues() to get predicted values on the new test data.")
+        	rval <- c()
+        	if(newdata == FALSE)
+        	{
+        		if(OOB == TRUE)
+        		{
+        			rval <- (rf@oobPredictions)@predMat			
+        		} else {
+        			rval <- (rf@GeneralPredictions)@predMat
+        		}
+        	} else { # if there is new data, then do the outsample prediction
+            
+        		rval <- (rf@NewDataPredictions)@predMat		
+            # apply outsample prediction
+        		pred.newdata = lapply(1:B, function(x) pp.out[[x]]$pred.new)
+        		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions,prob.cutoff), predType = "Newdata")		
+        		
+            
+            
+        	}		
+        	return(rval)
+        })
 
 setGeneric("residualPlot", function(object) standardGeneric("residualPlot"))
 setMethod("residualPlot", signature(object="mobForestOutput"), function(object) {

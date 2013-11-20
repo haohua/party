@@ -59,8 +59,7 @@ mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(),
         nodeid <<- nodeid + 1
         thisnode$model <- obj
         if (!thisnode$terminal) {
-            childweights <- party:::mob_fit_childweights(thisnode, mf, 
-                weights)
+            childweights <- party:::mob_fit_childweights(thisnode, mf,weights)
             if (any(sapply(childweights, sum) == 0)) {
                 thisnode$terminal <- TRUE
                 class(thisnode) <- "TerminalModelNode"
@@ -140,7 +139,7 @@ treePredictions <- function(j, data, tree)
 				tr = tr$right
 			}				
 		} else {	
-      # should change all the ordered variable split into numerical
+      # XXX should change all the ordered variable split into numerical
 			if (as.numeric(dat[j,newvar]) <= as.numeric(tr$psplit$splitpoint)) 
 			{	
 				tr = tr$left
@@ -200,7 +199,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
     oob.mse.perm = rep(0, length(partitionVars))
     varImp = rep(0, length(partitionVars))
     for(p in 1:length(partitionVars))
-    {		# permutation over the partitioning variables to get the importance 
+    {		#XXX permutation over the partitioning variables to get the variable importance in each single tree
       oob.perm = oob.sub
       oob.perm[,partitionVars[p]] = sample(oob.sub[,partitionVars[p]])
       oob.pred.perm = sapply(1:nrow(oob.perm), 
@@ -222,9 +221,12 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
                                     data = newTestData)@get("response")
       newdat.rsq = computeR2(obs.newdat, matrix(pred.new, ncol=1))
     }
-    ret <- list(oob.inds, oob.rsq, pred, (oob.mse.perm - mse.oob), mse.oob, gen.rsq, mse.gen, pred.new, 
+    ret <- list(oob.inds, oob.rsq, pred, 
+                (oob.mse.perm - mse.oob),
+                mse.oob, gen.rsq, mse.gen, pred.new, 
                 newdat.rsq, fmBH@tree)	
-    names(ret) <- c("oob.inds", "oob.R2", "pred", "rawVarImp",
+    names(ret) <- c("oob.inds", "oob.R2", "pred",
+                    "rawVarImp",
                     "mse.oob", "gen.R2", "mse.gen", "pred.new", "newdat.R2", 
                     'mf.single.tree')	
   }
@@ -301,6 +303,7 @@ getmobForestObject.LM <- function(object, mainModel,
 	general.predictions = matrix(NA, ncol=B, nrow= length(pp.out[[1]]$pred))
 	oob.predictions = matrix(NA, ncol=B, nrow= length(pp.out[[1]]$pred))
 	mf.trees = list()
+	mf.trees.prop = list()
 	for(i in 1:B)
 	{
 		oob.R2[i] = pp.out[[i]]$oob.R2
@@ -311,8 +314,11 @@ getmobForestObject.LM <- function(object, mainModel,
 		oob.predictions[pp.out[[i]][[1]],i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
+		mf.trees.prop[[i]] = ''# save the tree's property here: objective function, and path, etc 
 	}
-	
+	names(mf.trees) = c(1:B)
+  names(mf.trees.prop) = c(1:B)
+  
 	obs.outcome <- ModelEnvFormula(as.formula(mainModel), data = data)@get("response")
 	oobRes = obs.outcome[,1] - apply(oob.predictions, 1, mean, na.rm=T)
 	oobPred <- prediction_output(apply(oob.predictions, 1, mean, na.rm=T), apply(oob.predictions, 1, sd, na.rm=T), oobRes, oob.R2, oob.mse, computeR2(obs.outcome, oob.predictions), "OOB")	
@@ -337,7 +343,8 @@ getmobForestObject.LM <- function(object, mainModel,
                             paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | "),
                             fam = "", train.response = obs.outcome, 
                             new.response = newdata.obs, 
-	                          mf.trees = mf.trees)
+	                          mf.trees = mf.trees, 
+	                          mf.trees.prop = mf.trees.prop)
 	return(mfout)
 }
 
@@ -354,6 +361,7 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 	general.predictions = matrix(NA, ncol=B, nrow= length(pp.out[[1]]$pred))
 	oob.predictions = matrix(NA, ncol=B, nrow= length(pp.out[[1]]$pred))
 	mf.trees = list()
+	mf.trees.prop = list()
 	for(i in 1:B)
 	{
 		oob.acc[i] = pp.out[[i]]$oob.acc
@@ -362,9 +370,12 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 		oob.predictions[pp.out[[i]]$oob.inds,i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
+		mf.trees.prop[[i]] = '' # save the tree's property 
     
 	}
-	
+	names(mf.trees ) = c(1:B)
+  names(mf.trees.prop) = c(1:B)
+  
 	obs.outcome <- ModelEnvFormula(as.formula(mainModel), data = data)@get("response")
 	#levels(obs.outcome[,1]) <- list("0"=levels(obs.outcome[,1])[1], "1"=levels(obs.outcome[,1])[2])
 	
@@ -413,7 +424,8 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
                             paste(mainModel, paste(partitionVars, collapse=" + "), sep=" | "), 
                             fam = fam, train.response = obs.outcome, 
                             new.response = newdata.obs, 
-	                          mf.trees = mf.trees
+	                          mf.trees = mf.trees, 
+	                          mf.trees.prop = mf.trees.prop
                             )
 	return(mfout)
 }
