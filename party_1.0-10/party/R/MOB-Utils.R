@@ -9,6 +9,16 @@ terminal_nodeIDs <- function(node) {
   rr <- terminal_nodeIDs(node$right)
   return(c(ll, rr))
 }
+node_classes = function ( node){
+  if(!node$terminal){
+    print(paste ( as.character(node$nodeID), class(node$psplit)))
+    ll <- node_classes(node$left)
+    rr <- node_classes(node$right)
+  }else {
+    print ( paste ( as.character(node$nodeID), class(node$psplit), 'ending node'))
+  }
+  return()
+}
 
 
 #########################
@@ -61,7 +71,7 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
         return(node)
     }
 
-    ### variable selection via fluctuation tests
+    ### variable selection via fluctuation tests  # by generalized M-fluctutation test
     test <- try(mob_fit_fluctests(obj, mf, minsplit = minsplit, trim = trim,
       breakties = breakties, parm = parm))
 
@@ -106,6 +116,8 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
     } else {
         partvar <- mf@get("part")
         xselect <- partvar[[best]]
+        
+        # split the node given the variable from fluctuation test
         thissplit <- mob_fit_splitnode(xselect, obj, mf, weights, minsplit = minsplit, 
                                        objfun = objfun, verbose = verbose)
 
@@ -120,11 +132,11 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
                          sumweights = as.double(sum(weights)))
             class(node) <- "TerminalModelNode"  
             
-            ### more confusion than information
-	    ### warning("no admissable split found", call. = FALSE)
-	    if(verbose)
-	      cat(paste("\nNo admissable split found in ", sQuote(names(test$stat)[best]), "\n", sep = ""))	    
-	    return(node)
+                  ### more confusion than information
+      	    ### warning("no admissable split found", call. = FALSE)
+      	    if(verbose)
+      	      cat(paste("\nNo admissable split found in ", sQuote(names(test$stat)[best]), "\n", sep = ""))	    
+      	    return(node)
         }
 
         thissplit$variableID <- best
@@ -213,9 +225,9 @@ mob_fit_fluctests <- function(obj, mf, minsplit, trim, breakties, parm) {
         logp_estrella2003 <- function(x, k, lambda)
           -lgamma(k/2) + k/2 * log(x/2) - x/2 + log(abs(log(lambda) * (1 - k/x) + 2/x))
         ## FIXME: Estrella only works well for large enough x
-	## hence require x > 1.5 * k for Estrella approximation and
-	## use an ad hoc interpolation for larger p-values
-	p <- ifelse(x <= 1.5 * k, (x/(1.5 * k))^sqrt(k) * logp_estrella2003(1.5 * k, k, lambda), logp_estrella2003(x, k, lambda))
+      	## hence require x > 1.5 * k for Estrella approximation and
+      	## use an ad hoc interpolation for larger p-values
+      	p <- ifelse(x <= 1.5 * k, (x/(1.5 * k))^sqrt(k) * logp_estrella2003(1.5 * k, k, lambda), logp_estrella2003(x, k, lambda))
       } else {
         ## use Hansen (1997) approximation
         m <- ncol(beta)-1
@@ -307,7 +319,7 @@ mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = T
         minsplit <- ceiling(sum(weights) * minsplit)
    
     if (is.numeric(x)) {
-    ### for numerical variables
+    ### for numerical variables, sort the data, and get the objective function for each individual number 
         ux <- sort(unique(x))
         if (length(ux) == 0) stop("cannot find admissible split point in x")
         dev <- vector(mode = "numeric", length = length(ux))
@@ -329,11 +341,13 @@ mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = T
                       splitstatistic = dev, toleft = TRUE)
         class(split) <- "orderedSplit"
     } else {
-    ### for categorical variables
+    ### for categorical variables, find all the possible splitting combination first, and then get the sum of objective for both right and left splits for each possible combination
+      
         al <- mob_fit_getlevels(x)
         dev <- apply(al, 1, function(w) {
                    xs <- x %in% levels(x)[w]
                    if (mob_fit_checksplit(xs, weights, minsplit)) {
+                     # this is where sometimes the split fails 
                        return(Inf)
                    } else {
                        mob_fit_getobjfun(obj, mf, weights, xs, objfun = objfun)
@@ -376,6 +390,7 @@ mob_fit_getobjfun <- function(obj, mf, weights, left, objfun = deviance) {
   ## mf is the model frame
   ## weights are the observation weights
   ## left is 1 (if left of splitpoint) or 0
+  # for numerical splitting variables, the objective function to get the best splitting point is to sum the obj from both right and left sides 
   weightsleft <- weights * left
   weightsright <- weights * (1 - left)
 
@@ -411,6 +426,9 @@ mob_fit_getlevels <- function(x) {
     indx
 }
 
-### check split
+### check split if either side has more than the minsplits 
+# XXX But i think it would be great to have each side greater than minsplits
+# otherwise very biased categorical variable cannot get split: eg. A := 10000, B: = 100, and min split = 200
 mob_fit_checksplit <- function(split, weights, minsplit)
-    (sum(split * weights) < minsplit || sum((1 - split) * weights) < minsplit)
+  
+   { (sum(split * weights) < minsplit || sum((1 - split) * weights) < minsplit)}

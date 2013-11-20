@@ -31,7 +31,9 @@ lmfit <- function(object, weights = NULL, ...){
         } else {
             dm <- object@get("designMatrix")
         }
-        pr <- dm %*% coef(z)
+        temp.coef = coef(z)
+        temp.index = which(!is.na(temp.coef))
+        pr <- dm[,temp.index] %*% temp.coef[temp.index]
         if (ncol(pr) == 1) pr <- drop(pr)
         return(pr)
     }

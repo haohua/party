@@ -13,12 +13,26 @@
 #   return(rval)
 # }
 
-setClass("mobForestControl", representation(ntree = "numeric", mtry = "numeric", replace = "logical", fraction="numeric", mob.control = "list"), prototype = list(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632))
-mobForest_control <- function(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632, alpha = 1, bonferroni = FALSE, minsplit = 20, trim = 0.1, objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE)
+setClass("mobForestControl", 
+         representation(ntree = "numeric", 
+                        mtry = "numeric", 
+                        replace = "logical", 
+                        fraction="numeric", 
+                        mob.control = "list"), 
+         prototype = list(ntree = 300, mtry = 0, replace = FALSE, fraction = 0.632)
+         )
+mobForest_control <- function(ntree = 300, mtry = 0, replace = FALSE, 
+                              fraction = 0.632, alpha = 1, 
+                              bonferroni = FALSE, minsplit = 20, 
+                              trim = 0.1, 
+                              objfun = deviance, 
+                              breakties = FALSE, parm = NULL, verbose = FALSE)
 {
   mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit, trim = trim, objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
   class(mob.control) <- "list"
-  rval <- new("mobForestControl", ntree = ntree, mtry = mtry, replace = replace, fraction = fraction, mob.control = mob.control)
+  rval <- new("mobForestControl", 
+              ntree = ntree, mtry = mtry, replace = replace, 
+              fraction = fraction, mob.control = mob.control)
   return(rval)
 }
 
@@ -34,17 +48,48 @@ prediction_output <- function(predMean = numeric(), predSd = numeric(), residual
 	return(rval)
 }
 
-setClass("varimpOutput", representation(varimpMatrix = "matrix"), prototype = list(varimpMatrix = matrix(0,0,0)))
+setClass("varimpOutput", 
+         representation(varimpMatrix = "matrix"),
+         prototype = list(varimpMatrix = matrix(0,0,0)))
 varimp_output <- function(varimpMatrix)
 {	
 	rval <- new("varimpOutput", varimpMatrix = varimpMatrix)    
     return(rval)
 }
 
-setClass("mobForestOutput", representation(oobPredictions = "predictionOutput", GeneralPredictions = "predictionOutput", NewDataPredictions = "predictionOutput", VarimpObject = "varimpOutput", modelUsed = "character", fam = "character", train.response = "data.frame", new.response = "data.frame"))
-mobForest_output <- function(oobPredictions, GeneralPredictions, NewDataPredictions, VarimpObject, modelUsed, fam, train.response, new.response = data.frame(matrix(0,0,0)))
+# change the mobForestOutput class over here
+setClass("mobForestOutput", 
+         representation(oobPredictions = "predictionOutput",
+                        GeneralPredictions = "predictionOutput", 
+                        NewDataPredictions = "predictionOutput",
+                        VarimpObject = "varimpOutput", 
+                        modelUsed = "character",
+                        fam = "character",
+                        train.response = "data.frame",
+                        new.response = "data.frame", 
+                        mf.trees = 'list'
+                        
+                        ))
+mobForest_output <- function(oobPredictions, 
+                             GeneralPredictions, 
+                             NewDataPredictions, 
+                             VarimpObject, 
+                             modelUsed, 
+                             fam, 
+                             train.response, 
+                             new.response = data.frame(matrix(0,0,0)),
+                             mf.trees = list()
+                             )
 {
-	rval <- new("mobForestOutput",oobPredictions = oobPredictions, GeneralPredictions = GeneralPredictions, NewDataPredictions = NewDataPredictions, VarimpObject = VarimpObject, modelUsed = modelUsed, fam = fam, train.response = train.response, new.response = new.response)
+	rval <- new("mobForestOutput",
+              oobPredictions = oobPredictions, 
+              GeneralPredictions = GeneralPredictions, 
+              NewDataPredictions = NewDataPredictions, 
+              VarimpObject = VarimpObject, modelUsed = modelUsed, 
+              fam = fam, train.response = train.response,
+              new.response = new.response, 
+	            mf.trees = mf.trees
+              )
     return(rval)
 }
 
@@ -81,8 +126,8 @@ setMethod("varimplot", signature(object="mobForestOutput"), function(object) {
 })	
 })
 
-setGeneric("getPredictedValues", function(object, OOB = TRUE, newdata = FALSE) standardGeneric("getPredictedValues"))
-setMethod("getPredictedValues", signature(object="mobForestOutput", OOB="ANY", newdata="ANY"), function(object, OOB, newdata) {
+setGeneric("getPredictedValues", function(object, OOB = TRUE, newdata = FALSE, newTestData = as.data.frame(matrix(0,0,0))) standardGeneric("getPredictedValues"))
+setMethod("getPredictedValues", signature(object="mobForestOutput", OOB="ANY", newdata="ANY"), function(object, OOB, newdata, newTestData) {
 	
 	#if(missing(object)) cat("This function expects object of 'mobForestOutput', returned by mobForestAnalysis(), as its first argument\n")
 	rf <- object	
@@ -97,7 +142,7 @@ setMethod("getPredictedValues", signature(object="mobForestOutput", OOB="ANY", n
 		} else {
 			rval <- (rf@GeneralPredictions)@predMat
 		}
-	} else {
+	} else { # if there is new data, then do the outsample prediction
 		rval <- (rf@NewDataPredictions)@predMat		
 	}		
 	return(rval)

@@ -136,6 +136,8 @@ predict.mob <- function(object, newdata = NULL, type = c("response", "node"), ..
         for (n in unique(nodeIDs)) {
             node <- .Call("R_get_nodebynum", object@tree, as.integer(n), PACKAGE = "party")
             indx <- which(nodeIDs == n)
+            # here is where needed to be changed to handle the NA paramters 
+            node$model$predict_response = predict_response_modified
             pred[indx] <- predict(node$model, newdata = newinput[indx,,drop = FALSE], ...)
         }
 	rval <- if(isTRUE(all.equal(sapply(pred, length), rep(1, nobs)))) unlist(pred) else pred

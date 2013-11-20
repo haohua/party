@@ -1,4 +1,4 @@
-
+# print -> print.mob -> print.SplittingNode -> print.nominal / print.ordinal
 # $Id: Print.R 282 2006-10-09 14:23:30Z hothorn $
 
 prettysplit <- function(x, inames = NULL, ilevels = NULL) {
@@ -55,47 +55,149 @@ print.TerminalNode <- function(x, n = 1, ...) {
 }
  
 print.SplittingNode <- function(x, n = 1, ...) {
+    # print the splitting node 
     cat(paste(paste(rep(" ", n - 1), collapse = ""), x$nodeID, ") ", sep=""))
-    print(x$psplit, left = TRUE)
+    print(x$psplit, left = TRUE) # use print.nominalSplit 
     cat(paste("; criterion = ", round(x$criterion$maxcriterion, 3), 
               ", statistic = ", round(max(x$criterion$statistic), 3), "\n", 
               collapse = "", sep = ""))
-    print(x$left, n + 2)
+    print(x$left, n + 2) # after split once, the code is increased by 2 
     cat(paste(paste(rep(" ", n - 1), collapse = ""), x$nodeID, ") ", sep=""))
     print(x$psplit, left = FALSE)
     cat("\n")
     print(x$right, n + 2)
 }
-
 print.orderedSplit <- function(x, left = TRUE, ...) {
-    if (!is.null(attr(x$splitpoint, "levels"))) {
-        sp <- attr(x$splitpoint, "levels")[x$splitpoint]
-    } else {
-        sp <- x$splitpoint
-    }
-    if (!is.null(x$toleft)) left <- as.logical(x$toleft) == left
-    if (left) {
-        cat(x$variableName, "<=", sp)
-    } else {
-        cat(x$variableName, ">", sp)
-    }
+  if (!is.null(attr(x$splitpoint, "levels"))) {
+    sp <- attr(x$splitpoint, "levels")[x$splitpoint]
+  } else {
+    sp <- x$splitpoint
+  }
+  if (!is.null(x$toleft)) left <- as.logical(x$toleft) == left
+  if (left) {
+    cat(x$variableName, "<=", sp)
+  } else {
+    cat(x$variableName, ">", sp)
+  }
 }
 
+
 print.nominalSplit <- function(x, left = TRUE, ...) {
+  
+  levels <- attr(x$splitpoint, "levels")
+  
+  ### is > 0 for levels available in this node
+  tab <- x$table
+  
+  if (left) {
+    lev <- levels[as.logical(x$splitpoint) & (tab > 0)]
+  } else {
+    lev <- levels[!as.logical(x$splitpoint) & (tab > 0)]
+  }
+  
+  txt <- paste("{", paste(lev, collapse = ", "), "}", collapse = "", sep = "")
+  cat(x$variableName, "==", txt)
+}
+Conditioon.mob = function(x, ...){
+  if ( class( x@tree) == 'TerminalModelNode'){
+    Condition.TerminalNode(x@tree)
+  }else if ( class( x@tree) == "SplittingNode"){
+    Condition.SplittingNode(x@tree)
+  }
+}
+Condition.TerminalNode <- function(x, n = 1, ...) {
+  cat(paste(paste(rep(" ", n - 1), collapse = ""), x$nodeID, ")* ", 
+            sep = "", collapse = ""),
+      "weights =", sum(x$weights), "\n")
+}
 
-    levels <- attr(x$splitpoint, "levels")
 
-    ### is > 0 for levels available in this node
-    tab <- x$table
-
-    if (left) {
-        lev <- levels[as.logical(x$splitpoint) & (tab > 0)]
-    } else {
-        lev <- levels[!as.logical(x$splitpoint) & (tab > 0)]
+try(require(plyr))
+get_condition = function (condition, x ){
+  # x should be a psplit class
+  # condition is a data frame 
+  left_condition = condition 
+  right_condition = condition 
+  if( class(x)=="orderedSplit"){
+    max.name = paste(x$variableName, 'LessThan', sep = '_')
+    min.name = paste(x$variableName, 'MoreThan', sep = '_')
+    if ( max.name%in% names( condition)){
+      left_condition[[max.name]] = min(left_condition[[max.name]] , x$splitpoint, na.rm=T)
+      right_condition[[min.name]] = max(right_condition[[min.name]] , x$splitpoint, na.rm=T)
+    }else{
+      left_condition[[max.name]] = x$splitpoint
+      right_condition[[min.name]] = x$splitpoint
+      left_condition[[min.name]] = NA
+      right_condition[[max.name]] = NA
     }
+  }
+  
+  if( class(x) == "nominalSplit"){
+    levels <- attr(x$splitpoint, "levels")
+    tab <- x$table
+    left_condition[[x$variableName]] <- paste(c(levels[as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+    right_condition[[ x$variableName]] <-paste(c(levels[!as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+  }
+  return ( list('left'=left_condition,
+                'right'= right_condition
+  ))
+}
 
-    txt <- paste("{", paste(lev, collapse = ", "), "}", collapse = "", sep = "")
-    cat(x$variableName, "==", txt)
+Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
+  # get conditions for splitting node 
+  condition.result = data.frame()
+  if(is.null ( condition)){
+    condition = list()
+  }
+  condition = get_condition(condition,x$psplit )
+  left_condition = condition[['left']]
+  right_condition = condition[['right']]
+
+  condition.result.left = data.frame()
+  condition.result.right = data.frame()
+  if ( x$left$terminal){
+    objFunValue = 0 
+    if ( !is.null( objfun)){
+      objFunValue = objfun(x$left$model) 
+    }
+    condition.result.left = data.frame(t(sapply(left_condition,c)))
+    condition.result.left$nodeID = x$left$nodeID
+    condition.result.left$objFunValue = objFunValue
+    
+  }else{
+    # pass to left 
+#     left_condition = rbind( condition, left_condition)
+    
+    condition.result = 
+      rbind.fill( condition.result, 
+             Condition.SplittingNode (x$left, condition = left_condition, objfun=objfun ) 
+             )
+  }
+  
+  if( x$right$terminal){
+
+    objFunValue = 0 
+    if ( !is.null( objfun)){
+      objFunValue = objfun(x$right$model)
+    }
+    
+    condition.result.right = data.frame(t(sapply(right_condition,c)))
+    condition.result.right$nodeID = x$right$nodeID
+    condition.result.right$objFunValue = objFunValue
+#     condition.result.right = data.frame(nodeID = x$right$nodeID, 
+#                                         path = right_condition, 
+#                                         objFunValue = objFunValue)
+    condition.result = rbind.fill(condition.result,condition.result.right, condition.result.left  )
+  }else{
+    # pass condition to right 
+    
+    condition.result = 
+      rbind.fill( condition.result,
+             condition.result.left, 
+             Condition.SplittingNode (x$right, condition = right_condition, objfun=objfun ) 
+      )
+  }
+  return ( condition.result)
 }
 
 
