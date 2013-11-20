@@ -1,5 +1,92 @@
 # Version 4 was made because parseFormula() had a bug that needed to be rectified. 
 # Version 5 for adding the generalized linear model functionality
+try(require(plyr))
+get_condition = function (condition, x ){
+  # x should be a psplit class
+  # condition is a data frame 
+  left_condition = condition 
+  right_condition = condition 
+  if( class(x)=="orderedSplit"){
+    max.name = paste(x$variableName, 'LessThan', sep = '_')
+    min.name = paste(x$variableName, 'MoreThan', sep = '_')
+    if ( max.name%in% names( condition)){
+      left_condition[[max.name]] = min(left_condition[[max.name]] , x$splitpoint, na.rm=T)
+      right_condition[[min.name]] = max(right_condition[[min.name]] , x$splitpoint, na.rm=T)
+    }else{
+      left_condition[[max.name]] = x$splitpoint
+      right_condition[[min.name]] = x$splitpoint
+      left_condition[[min.name]] = NA
+      right_condition[[max.name]] = NA
+    }
+  }
+  
+  if( class(x) == "nominalSplit"){
+    levels <- attr(x$splitpoint, "levels")
+    tab <- x$table
+    left_condition[[x$variableName]] <- paste(c(levels[as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+    right_condition[[ x$variableName]] <-paste(c(levels[!as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+  }
+  return ( list('left'=left_condition,
+                'right'= right_condition
+  ))
+}
+
+Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
+  # get conditions for splitting node 
+  condition.result = data.frame()
+  if(is.null ( condition)){
+    condition = list()
+  }
+  condition = get_condition(condition,x$psplit )
+  left_condition = condition[['left']]
+  right_condition = condition[['right']]
+  
+  condition.result.left = data.frame()
+  condition.result.right = data.frame()
+  if ( x$left$terminal){
+    objFunValue = 0 
+    if ( !is.null( objfun)){
+      objFunValue = objfun(x$left$model) 
+    }
+    condition.result.left = data.frame(t(sapply(left_condition,c)))
+    condition.result.left$nodeID = x$left$nodeID
+    condition.result.left$objFunValue = objFunValue
+    
+  }else{
+    # pass to left 
+    #     left_condition = rbind( condition, left_condition)
+    
+    condition.result = 
+      rbind.fill( condition.result, 
+                  Condition.SplittingNode (x$left, condition = left_condition, objfun=objfun ) 
+      )
+  }
+  
+  if( x$right$terminal){
+    
+    objFunValue = 0 
+    if ( !is.null( objfun)){
+      objFunValue = objfun(x$right$model)
+    }
+    
+    condition.result.right = data.frame(t(sapply(right_condition,c)))
+    condition.result.right$nodeID = x$right$nodeID
+    condition.result.right$objFunValue = objFunValue
+    #     condition.result.right = data.frame(nodeID = x$right$nodeID, 
+    #                                         path = right_condition, 
+    #                                         objFunValue = objFunValue)
+    condition.result = rbind.fill(condition.result,condition.result.right, condition.result.left  )
+  }else{
+    # pass condition to right 
+    
+    condition.result = 
+      rbind.fill( condition.result,
+                  condition.result.left, 
+                  Condition.SplittingNode (x$right, condition = right_condition, objfun=objfun ) 
+      )
+  }
+  return ( condition.result)
+}
 
 mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(), na.action = na.omit, model = glinearModel, control = mob_control(), ...)
 {	
@@ -290,7 +377,7 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
 
 
 getmobForestObject.LM <- function(object, mainModel, 
-                                  partitionVars, data, newTestData, ntree, fam)
+                                  partitionVars, data, newTestData, ntree, fam,objfun)
 {		
 	B = ntree
 	pp.out <- object
@@ -314,7 +401,9 @@ getmobForestObject.LM <- function(object, mainModel,
 		oob.predictions[pp.out[[i]][[1]],i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-		mf.trees.prop[[i]] = ''# save the tree's property here: objective function, and path, etc 
+		mf.trees.prop[[i]] = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+		                                             condition = NULL, 
+		                                             objfun=objfun ) # save the tree's property here: objective function, and path, etc 
 	}
 	names(mf.trees) = c(1:B)
   names(mf.trees.prop) = c(1:B)
@@ -348,7 +437,7 @@ getmobForestObject.LM <- function(object, mainModel,
 	return(mfout)
 }
 
-getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTestData, ntree, fam, prob.cutoff)
+getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTestData, ntree, fam, prob.cutoff,objfun)
 {		
 	if(is.null(prob.cutoff)) prob.cutoff = 0.5
       
@@ -370,7 +459,10 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 		oob.predictions[pp.out[[i]]$oob.inds,i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-		mf.trees.prop[[i]] = '' # save the tree's property 
+		mf.trees.prop[[i]] = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+		                                             condition = NULL, 
+		                                             objfun=objfun ) # save the tree's property here: objective function, and path, etc 
+		
     
 	}
 	names(mf.trees ) = c(1:B)
@@ -451,6 +543,8 @@ mobForestAnalysis <- function(formula, partitionVariables,
 	partitionVars = partitionVariables
 	B = mobForest.controls@ntree
 	mtry = mobForest.controls@mtry	
+	objfun = mobForest.controls@mob_control$objfun
+  
 	if(mtry == 0) mtry = round(length(partitionVars)/3)	
 	fraction = mobForest.controls@fraction
 	if (mobForest.controls@replace == TRUE) fraction = 1		
@@ -484,7 +578,8 @@ mobForestAnalysis <- function(formula, partitionVariables,
                                       data = data, 
                                       newTestData = newTestData, 
                                       ntree = B, fam = "binomial",
-                                      prob.cutoff = prob.cutoff)
+                                      prob.cutoff = prob.cutoff,
+			                                objfun = objfun)
 		}
 		if (family$family == "poisson") {
 			mfObj <- getmobForestObject.LM(pp.out, 
@@ -493,7 +588,8 @@ mobForestAnalysis <- function(formula, partitionVariables,
                                      data = data, 
                                      newTestData = newTestData, 
                                      ntree = B, 
-                                     fam = "poisson")
+                                     fam = "poisson", 
+			                               objfun = objfun)
 		}
 	}
 	if (model@name == "linear regression model") {
@@ -503,7 +599,8 @@ mobForestAnalysis <- function(formula, partitionVariables,
                                    data = data, 
                                    newTestData = newTestData, 
                                    ntree = B, 
-                                   fam = "")
+                                   fam = "", 
+		                               objfun = objfun)
 	}
 	return(mfObj)	
 }

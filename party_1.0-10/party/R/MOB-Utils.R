@@ -447,7 +447,7 @@ Condition.TerminalNode <- function(x, n = 1, ...) {
             sep = "", collapse = ""),
       "weights =", sum(x$weights), "\n")
 }
-# try(require(plyr))
+try(require(plyr))
 get_condition = function (condition, x ){
   # x should be a psplit class
   # condition is a data frame 
