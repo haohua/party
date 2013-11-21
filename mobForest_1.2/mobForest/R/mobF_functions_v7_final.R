@@ -1,6 +1,6 @@
 # Version 4 was made because parseFormula() had a bug that needed to be rectified. 
 # Version 5 for adding the generalized linear model functionality
-try(require(plyr))
+
 get_condition = function (condition, x ){
   # x should be a psplit class
   # condition is a data frame 
@@ -32,7 +32,7 @@ get_condition = function (condition, x ){
 }
 
 Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
-  # get conditions for splitting node 
+  # get condition path and objective function value for splitting node
   condition.result = data.frame()
   if(is.null ( condition)){
     condition = list()
@@ -51,13 +51,14 @@ Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
     condition.result.left = data.frame(t(sapply(left_condition,c)))
     condition.result.left$nodeID = x$left$nodeID
     condition.result.left$objFunValue = objFunValue
+#     condition.result.left$ = objFunValue
     
   }else{
     # pass to left 
     #     left_condition = rbind( condition, left_condition)
     
     condition.result = 
-      rbind.fill( condition.result, 
+      plyr:::rbind.fill( condition.result, 
                   Condition.SplittingNode (x$left, condition = left_condition, objfun=objfun ) 
       )
   }
@@ -75,12 +76,12 @@ Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
     #     condition.result.right = data.frame(nodeID = x$right$nodeID, 
     #                                         path = right_condition, 
     #                                         objFunValue = objFunValue)
-    condition.result = rbind.fill(condition.result,condition.result.right, condition.result.left  )
+    condition.result = plyr:::rbind.fill(condition.result,condition.result.right, condition.result.left  )
   }else{
     # pass condition to right 
     
     condition.result = 
-      rbind.fill( condition.result,
+      plyr:::rbind.fill( condition.result,
                   condition.result.left, 
                   Condition.SplittingNode (x$right, condition = right_condition, objfun=objfun ) 
       )
@@ -235,7 +236,9 @@ treePredictions <- function(j, data, tree)
 			}			
 		}			
 	}
-	return(as.numeric(tr$model$predict_response(dat[j,])))	
+# 	return(as.numeric(tr$model$predict_response(dat[j,])))	
+	return(list ( response = as.numeric(tr$model$predict_response(dat[j,])),
+                node = tr$nodeID))	
 } 
 
 # bootstrap over a list of tree numbers and generate tree for each of them
@@ -265,7 +268,14 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
   
   oob.inds = setdiff(1:nrow(data), data.subinds)
   oob.sub = data[oob.inds,]
-  pred = sapply(1:nrow(data), treePredictions, data = data, tree = fmBH@tree)
+  
+#   pred = sapply(1:nrow(data), treePredictions, data = data, tree = fmBH@tree)
+  pred = sapply(1:nrow(data), 
+                function ( j){
+                  temp.pred = treePredictions(j, data = data, tree = fmBH@tree)
+                    return ( temp.pred[['response']])
+                }
+                )
   
   # get the response variable from the model formula, instead of quoting the column names
   obs.outcome <- ModelEnvFormula(as.formula(mainModel), data = data)@get("response")
@@ -289,9 +299,16 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
     {		#XXX permutation over the partitioning variables to get the variable importance in each single tree
       oob.perm = oob.sub
       oob.perm[,partitionVars[p]] = sample(oob.sub[,partitionVars[p]])
+#       oob.pred.perm = sapply(1:nrow(oob.perm), 
+#                              treePredictions, 
+#                              data = oob.perm, tree = fmBH@tree)			
       oob.pred.perm = sapply(1:nrow(oob.perm), 
-                             treePredictions, 
-                             data = oob.perm, tree = fmBH@tree)			
+                    function ( j){
+                      temp.pred = treePredictions(j, data = oob.perm, tree = fmBH@tree)
+                      return ( temp.pred[['response']])
+                    }
+      )
+      
       oob.rsq.perm[p] = computeR2(matrix(obs.outcome[oob.inds,],ncol=1), matrix(oob.pred.perm, ncol=1))
       oob.mse.perm[p] = computeMSE(matrix(obs.outcome[oob.inds,],ncol=1), matrix(oob.pred.perm, ncol=1))
       #oob.rsq.perm[p] = 1 - (sse.perm/ssto.oob)		
@@ -301,9 +318,16 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
     newdat.rsq = c()
     if(nrow(newTestData) > 0) 
     {
+#       pred.new = sapply(1:nrow(newTestData), 
+#                         treePredictions, 
+#                         data = newTestData, tree = fmBH@tree)
       pred.new = sapply(1:nrow(newTestData), 
-                        treePredictions, 
-                        data = newTestData, tree = fmBH@tree)
+                             function ( j){
+                               temp.pred = treePredictions(j, data = newTestData, tree = fmBH@tree)
+                               return ( temp.pred[['response']])
+                             }
+      )
+      
       obs.newdat <- ModelEnvFormula(as.formula(paste(mainModel, partitionVars, sep=" | ")),
                                     data = newTestData)@get("response")
       newdat.rsq = computeR2(obs.newdat, matrix(pred.new, ncol=1))
@@ -333,7 +357,15 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
       {		
         oob.perm = oob.sub
         oob.perm[,partitionVars[p]] = sample(oob.sub[,partitionVars[p]])
-        oob.pred.perm = sapply(1:nrow(oob.perm), treePredictions, data = oob.perm, tree = fmBH@tree)
+#         oob.pred.perm = sapply(1:nrow(oob.perm), treePredictions, data = oob.perm, tree = fmBH@tree)
+        oob.pred.perm = sapply(1:nrow(oob.perm), 
+                               function ( j){
+                                 temp.pred = treePredictions(j, data = oob.perm, tree = fmBH@tree)
+                                 return ( temp.pred[['response']])
+                               }
+        )
+        
+        
         pred.class.perm = rep(0, length(oob.pred.perm))
         pred.class.perm[which(oob.pred.perm > prob.cutoff)] = 1
         #oob.acc.perm[p] = computeR2(obs.outcome[oob.inds,], matrix(oob.pred.perm, ncol=1))
@@ -344,10 +376,18 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
       newdat.acc = c()
       if(nrow(newTestData) > 0)
       {
+#         pred.new = sapply(1:nrow(newTestData), 
+#                           treePredictions, 
+#                           data = newTestData,
+#                           tree = fmBH@tree)
         pred.new = sapply(1:nrow(newTestData), 
-                          treePredictions, 
-                          data = newTestData,
-                          tree = fmBH@tree)
+                          function ( j){
+                            temp.pred = treePredictions(j, data = newTestData, tree = fmBH@tree)
+                            return ( temp.pred[['response']])
+                          }
+        )
+        
+        
         predNew.class = rep(0, length(pred.new))
         predNew.class[which(pred > prob.cutoff)] = 1
         obs.newdat <- ModelEnvFormula(as.formula(paste(mainModel, partitionVars, sep=" | ")), data = newTestData)@get("response")
@@ -543,7 +583,7 @@ mobForestAnalysis <- function(formula, partitionVariables,
 	partitionVars = partitionVariables
 	B = mobForest.controls@ntree
 	mtry = mobForest.controls@mtry	
-	objfun = mobForest.controls@mob_control$objfun
+	objfun = mobForest.controls@mob.control$objfun
   
 	if(mtry == 0) mtry = round(length(partitionVars)/3)	
 	fraction = mobForest.controls@fraction

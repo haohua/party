@@ -16,7 +16,7 @@ Description: This package implements random forest method for model
         function within 'parallel' package.
 License: GPL (>= 2)
 LazyLoad: yes
-Depends: parallel, party, lattice
+Depends: parallel, party, lattice, plyr
 Imports: methods, modeltools
 Suggests: mlbench
 Packaged: 2013-01-28 21:36:14 UTC; ngarge

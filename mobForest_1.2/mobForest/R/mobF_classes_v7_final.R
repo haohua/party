@@ -155,7 +155,22 @@ setMethod("getPredictedValues",
             
         		rval <- (rf@NewDataPredictions)@predMat		
             # apply outsample prediction
-        		pred.newdata = lapply(1:B, function(x) pp.out[[x]]$pred.new)
+        		sapply(1:nrow(newTestData), 
+                   treePredictions, 
+                   data = newTestData[1,], 
+                   tree = rf@mf.trees[[tree_id]])
+            pred.newdata = 
+        		  lapply( 1:nrow(newTestData), 
+        		          function ( data_id){ # data_id = 2
+        		            sapply(names(rf@mf.trees), 
+        		                    function(tree_id) { #tree_id = '1'
+        		                     treePredictions(data_id, 
+                                                 data = newTestData,tree = rf@mf.trees[[tree_id]])
+        		                   })
+        		         })
+            
+        		
+              
         		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions,prob.cutoff), predType = "Newdata")		
         		
             
