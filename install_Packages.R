@@ -43,28 +43,23 @@ pred = getPredictedValues(object=rfout, newdata=T,
 # in the pred result, you may check statistics for each tree, each single node, and some average stat accross the trees
 # documentation is not supplied, please let me know if there is any question. 
 
-# # eg.
+# eg.
 # > pred
 # response
 # [,1]     [,2]     [,3]
 # [1,] 24.95467 29.74449 29.03649
-# 
 # $node
 # [,1] [,2] [,3]
 # [1,]   12    7    1
-# 
 # $nodeAdjR2
 # [,1]      [,2]     [,3]
 # [1,] 0.3608695 0.5866803 0.519687
-# 
 # $nodeObjFunValue
 # [,1]       [,2]       [,3]
 # [1,] -0.6809822 -0.7729968 -0.8159765
-# 
 # $predMat
 # PredMean PredStdev  Residual AvgNodeAdjR2 AvgNodeObjFunValue
 # [1,] 27.91188  2.585372 -3.911881    0.4890789         -0.7566518
-# 
 # $predConditions
 # $predConditions[[1]]
 # tax_LessThan tax_MoreThan nodeID objFunValue     AdjR2 crim_LessThan crim_MoreThan
