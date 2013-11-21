@@ -153,28 +153,68 @@ setMethod("getPredictedValues",
         		}
         	} else { # if there is new data, then do the outsample prediction
             
-        		rval <- (rf@NewDataPredictions)@predMat		
-            # apply outsample prediction
-        		sapply(1:nrow(newTestData), 
-                   treePredictions, 
-                   data = newTestData[1,], 
-                   tree = rf@mf.trees[[tree_id]])
-            pred.newdata = 
-        		  lapply( 1:nrow(newTestData), 
-        		          function ( data_id){ # data_id = 2
-        		            sapply(names(rf@mf.trees), 
-        		                    function(tree_id) { #tree_id = '1'
-        		                     treePredictions(data_id, 
-                                                 data = newTestData,tree = rf@mf.trees[[tree_id]])
-        		                   })
-        		         })
+#         		rval <- (rf@NewDataPredictions)@predMat		
+        	  nrow.New = nrow(newTestData)
+        	  pred.newdata = 
+        	    lapply( 1 : nrow.New,  # newTestData = BostonHousing[c(1:5),]
+        	            function ( data_id){ # data_id = 2
+        	              sapply(names(rf@mf.trees), 
+        	                     function(tree_id) { #tree_id = '1'
+        	                       temp_pred = treePredictions(data_id, 
+        	                                                   data = newTestData,
+        	                                                   tree = rf@mf.trees[[tree_id]])
+        	                       return ( c( unlist(temp_pred), 
+        	                                   rf@mf.trees.prop[[tree_id]][which(row.names(rf@mf.trees.prop[[tree_id]]) ==temp_pred[['node']]),
+        	                                                               c('AdjR2','objFunValue' ) ]
+        	                       )
+        	                       )
+        	                     })
+        	            })
+        	  
+        		newData.outcome <- ModelEnvFormula(as.formula(rf@modelUsed),
+                                               data =newTestData )@get("response")
+            predResponse = matrix(unlist(t(sapply(pred.newdata, function(x){x[1,]}))), 
+                                  nrow = nrow.New)# N * B
+        	  prednode = matrix(unlist(t(sapply(pred.newdata, function(x){x[2,]}))), 
+                                  nrow = nrow.New)# N * B
+            nodeAdjR2 =  matrix(unlist(t(sapply(pred.newdata, function(x){x[3,]}))), 
+        	                      nrow = nrow.New)# N * B
+             
+        	  nodeObjFunValue =  matrix(unlist(t(sapply(pred.newdata, function(x){x[4,]}))), 
+        	                      nrow = nrow.New)# N * B
+        	  
+            predMat = matrix(0, nrow = nrow.New, ncol = 5)
+        		predMat[,1] = apply(predResponse, 1, mean, na.rm=T)
+        		predMat[,2] = apply(predResponse, 1, sd, na.rm=T)
+        		predMat[,3] = newData.outcome[,1] - predMat[,1] # mean of (y - y_hat)
+        	  predMat[,4] = apply(nodeAdjR2, 1, mean, na.rm=T)
+        	  predMat[,5] = apply(nodeObjFunValue, 1, mean, na.rm=T)
+        	  
+        		colnames(predMat) = c("PredMean", "PredStdev", "Residual", "AvgNodeAdjR2","AvgNodeObjFunValue" )
+            # conditions for each data at all trees 
+            predConditions = 
+              lapply( 1:nrow.New, 
+                    function(index_i){ # index_i = 1
+                      temp.nodes = prednode[index_i,]
+                      do.call(plyr:::rbind.fill, 
+                              lapply(1:length(temp.nodes),
+                                     function(tree_id) { # tree_id = 1
+                                       temp.prop.data = rf@mf.trees.prop[[tree_id]][which(row.names(rf@mf.trees.prop[[tree_id]]) ==temp.nodes[tree_id]),]
+                                       temp.prop.data$tree_id = tree_id
+                                       return( temp.prop.data)
+                                       })
+                      )
+                    }
+                    )
             
-        		
-              
-        		newdataPred <- prediction_output(predMean = apply(newdata.predictions, 1, mean, na.rm=T), predSd = apply(newdata.predictions, 1, sd, na.rm=T), residual = newdatRes, R2 = newdata.acc,  overallR2 = computeAcc(newdata.obs, newdata.predictions,prob.cutoff), predType = "Newdata")		
-        		
-            
-            
+        		rval = list( 
+              'response' = predResponse, # N * B
+              'node' = prednode, 
+              'nodeAdjR2' = nodeAdjR2,
+              'nodeObjFunValue' = nodeObjFunValue,
+              'predMat' = predMat, 
+              'predConditions' = predConditions
+              )
         	}		
         	return(rval)
         })

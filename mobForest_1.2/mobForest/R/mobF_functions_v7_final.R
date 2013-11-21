@@ -33,6 +33,18 @@ get_condition = function (condition, x ){
 
 Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
   # get condition path and objective function value for splitting node
+  if (x$terminal){
+    # this should be a very rare case, because only the node 1 == terminal node
+    objFunValue = 0 
+    if ( !is.null( objfun)){
+      objFunValue = objfun(x$model) 
+    }
+    return (data.frame(nodeID = x$nodeID, 
+                       objFunValue = objFunValue, 
+                       AdjR2 = summary(x$model)$adj.r.squared
+                       ))
+  }
+  
   condition.result = data.frame()
   if(is.null ( condition)){
     condition = list()
@@ -51,7 +63,7 @@ Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
     condition.result.left = data.frame(t(sapply(left_condition,c)))
     condition.result.left$nodeID = x$left$nodeID
     condition.result.left$objFunValue = objFunValue
-#     condition.result.left$ = objFunValue
+    condition.result.left$AdjR2 = summary(x$left$model)$adj.r.squared
     
   }else{
     # pass to left 
@@ -73,6 +85,8 @@ Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
     condition.result.right = data.frame(t(sapply(right_condition,c)))
     condition.result.right$nodeID = x$right$nodeID
     condition.result.right$objFunValue = objFunValue
+    condition.result.right$AdjR2 = summary(x$right$model)$adj.r.squared
+    
     #     condition.result.right = data.frame(nodeID = x$right$nodeID, 
     #                                         path = right_condition, 
     #                                         objFunValue = objFunValue)
@@ -238,7 +252,9 @@ treePredictions <- function(j, data, tree)
 	}
 # 	return(as.numeric(tr$model$predict_response(dat[j,])))	
 	return(list ( response = as.numeric(tr$model$predict_response(dat[j,])),
-                node = tr$nodeID))	
+                node = tr$nodeID
+#                 , AdjR2 = summary(tr$model)$adj.r.squared
+                ))	
 } 
 
 # bootstrap over a list of tree numbers and generate tree for each of them
@@ -441,9 +457,12 @@ getmobForestObject.LM <- function(object, mainModel,
 		oob.predictions[pp.out[[i]][[1]],i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-		mf.trees.prop[[i]] = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
-		                                             condition = NULL, 
-		                                             objfun=objfun ) # save the tree's property here: objective function, and path, etc 
+		temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+		                                    condition = NULL, 
+		                                    objfun=objfun ) # save the tree's property here: objective function, and path, etc
+		row.names(temp.prop) = temp.prop$nodeID
+		mf.trees.prop[[i]] =  temp.prop
+		
 	}
 	names(mf.trees) = c(1:B)
   names(mf.trees.prop) = c(1:B)
@@ -499,9 +518,12 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 		oob.predictions[pp.out[[i]]$oob.inds,i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
 		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-		mf.trees.prop[[i]] = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
-		                                             condition = NULL, 
-		                                             objfun=objfun ) # save the tree's property here: objective function, and path, etc 
+    temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+                                        condition = NULL, 
+                                        objfun=objfun ) # save the tree's property here: objective function, and path, etc
+    row.names(temp.prop) = temp.prop$nodeID
+    
+		mf.trees.prop[[i]] =  temp.prop
 		
     
 	}
