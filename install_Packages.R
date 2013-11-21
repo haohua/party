@@ -1,6 +1,6 @@
 # step 1: install the correct Rtools for R complier 
 # step 2: modify the "pack_root" to your directory, or send your Sys.info()[['nodename']] to us 
-# step 3: install from source by the following 
+# step 3: uncomment the install part and install from source by the following codes
 
 if(Sys.info()[['nodename']]=='US-WASH-23C9KQ1'){
   pack_root<<-"C:/MuniGit"
@@ -20,6 +20,7 @@ set.seed(290875)
 #                   repos = NULL, type = 'source')
 # install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
 #                   repos = NULL, type = 'source')
+library(modeltools)
 library(party)
 library(mobForest)
 
@@ -29,8 +30,13 @@ rfout <- mobForestAnalysis(as.formula(medv ~ lstat),
                            c("rad", "tax", "crim"), mobForest.controls =
                              mobForest_control(ntree = 3, mtry = 2, replace = TRUE,
                                                alpha = 0.05, bonferroni = TRUE,
+                                               
+                                               objfun = correl.obj,
+                                               # here the correl.obj is embeded in the modeltools, but you may supply your own objfun
+                                               
                                                minsplit = 25),
                            data = BostonHousing, processors = 3, model = linearModel)
+
 pred = getPredictedValues(object=rfout, newdata=T, 
                           newTestData=BostonHousing[1, ])
 

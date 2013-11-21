@@ -190,3 +190,42 @@ Predict <- function(object, ...) {
     }
     return(predict(object, ...))
 }
+
+
+# define customized objective functions for mob 
+correl.obj = function  ( model.object, cor.class = 'spearman'  )
+{
+  # objective function to be used in the mob_control 
+  if ( is.null ( model.object$weights))
+  {
+    model.index = c(1:length(model.object$fitted.values))
+  }
+  else 
+  { 
+    
+    model.index = which(model.object$weights>0)
+  }
+  correl = -cor ( model.object$fitted.values[model.index], 
+                  model.object$fitted.values[model.index] + model.object$residuals[model.index], 
+                  method=cor.class)
+  
+  return(correl)
+}
+correl.obj.x_y = function  ( model.object, cor.class = 'spearman'  )
+{
+  # objective function to be used in the mob_control 
+  if ( is.null ( model.object$weights))
+  {
+    model.index = c(1:length(model.object$fitted.values))
+  }
+  else 
+  { 
+    model.index = which(model.object$weights > 0)
+  }
+  temp.coef = coef(model.object)
+  model_x = (model.object$fitted.values[model.index] - temp.coef[1])/temp.coef[2]
+  model_y = model.object$fitted.values[model.index] + model.object$residuals[model.index]
+  correl = -cor ( rank(model_x), rank(model_y), method = cor.class)
+  return(correl)
+}
+
