@@ -351,11 +351,11 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
     ret <- list(oob.inds, oob.rsq, pred, 
                 (oob.mse.perm - mse.oob),
                 mse.oob, gen.rsq, mse.gen, pred.new, 
-                newdat.rsq, fmBH@tree)	
+                newdat.rsq, fmBH)	
     names(ret) <- c("oob.inds", "oob.R2", "pred",
                     "rawVarImp",
                     "mse.oob", "gen.R2", "mse.gen", "pred.new", "newdat.R2", 
-                    'mf.single.tree')	
+                    'mf.single.mob')	
   }
   
   if (model@name == "generalized linear regression model")
@@ -418,12 +418,12 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
                   (gen.acc/nrow(data)),
                   pred.new, 
                   newdat.acc,
-                  fmBH@tree
+                  fmBH
       )
       
       names(ret) <- c("oob.inds", "oob.acc", "pred", "rawVarImp",
                       "gen.acc", "pred.new", "newdat.acc", 
-                      'mf.single.tree')
+                      'mf.single.mob')
       
       # XXX here is the place what the tree returns 
     }
@@ -456,8 +456,8 @@ getmobForestObject.LM <- function(object, mainModel,
 		general.predictions[,i] = pp.out[[i]]$pred
 		oob.predictions[pp.out[[i]][[1]],i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
-		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-		temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+		mf.trees[[i]] = pp.out[[i]]$mf.single.mob
+		temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.mob@tree, 
 		                                    condition = NULL, 
 		                                    objfun=objfun ) # save the tree's property here: objective function, and path, etc
 		row.names(temp.prop) = temp.prop$nodeID
@@ -517,8 +517,8 @@ getmobForestObject.GLM <- function(object, mainModel, partitionVars, data, newTe
 		general.predictions[,i] = pp.out[[i]]$pred
 		oob.predictions[pp.out[[i]]$oob.inds,i] = pp.out[[i]]$pred[pp.out[[i]]$oob.inds]
 		varImpMatrix[,i] = pp.out[[i]]$rawVarImp	
-		mf.trees[[i]] = pp.out[[i]]$mf.single.tree
-    temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.tree, 
+		mf.trees[[i]] = pp.out[[i]]$mf.single.mob
+    temp.prop = Condition.SplittingNode(pp.out[[i]]$mf.single.mob@tree, 
                                         condition = NULL, 
                                         objfun=objfun ) # save the tree's property here: objective function, and path, etc
     row.names(temp.prop) = temp.prop$nodeID

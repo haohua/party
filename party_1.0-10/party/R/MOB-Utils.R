@@ -59,6 +59,7 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
     verbose <- control$verbose
     breakties <- control$breakties
     parm <- control$parm
+    objfun_method <- control$objfun_method
 
     ### if too few observations: no split = return terminal node
     if (sum(weights) < 2 * minsplit) {
@@ -119,7 +120,8 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
         
         # split the node given the variable from fluctuation test
         thissplit <- mob_fit_splitnode(xselect, obj, mf, weights, minsplit = minsplit, 
-                                       objfun = objfun, verbose = verbose)
+                                       objfun = objfun, verbose = verbose, 
+                                       objfun_method = objfun_method)
 
         ## check if splitting was unsuccessful
         if (identical(FALSE, thissplit)) {
@@ -311,7 +313,8 @@ mob_fit_fluctests <- function(obj, mf, minsplit, trim, breakties, parm) {
 }
 
 ### split in variable x, either ordered or nominal
-mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = TRUE) {
+mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = TRUE, 
+                              objfun_method = 'sum') {
 
     ## process minsplit (to minimal number of observations)
     if (minsplit > 0.5 & minsplit < 1) minsplit <- 1 - minsplit
@@ -329,7 +332,7 @@ mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = T
             if (mob_fit_checksplit(xs, weights, minsplit)) {
                 dev[i] <- Inf
             } else {
-                dev[i] <- mob_fit_getobjfun(obj, mf, weights, xs, objfun = objfun)
+                dev[i] <- mob_fit_getobjfun(obj, mf, weights, xs, objfun = objfun, objfun_method = objfun_method)
             }
         }
 
@@ -350,7 +353,7 @@ mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = T
                      # this is where sometimes the split fails 
                        return(Inf)
                    } else {
-                       mob_fit_getobjfun(obj, mf, weights, xs, objfun = objfun)
+                       mob_fit_getobjfun(obj, mf, weights, xs, objfun = objfun, objfun_method = objfun_method)
                    }
                })
 
@@ -386,7 +389,7 @@ mob_fit_splitnode <- function(x, obj, mf, weights, minsplit, objfun, verbose = T
 }
 
 ### get partitioned objective function for a particular split
-mob_fit_getobjfun <- function(obj, mf, weights, left, objfun = deviance) {
+mob_fit_getobjfun <- function(obj, mf, weights, left, objfun = deviance, objfun_method = 'sum') {
   ## mf is the model frame
   ## weights are the observation weights
   ## left is 1 (if left of splitpoint) or 0
@@ -397,8 +400,13 @@ mob_fit_getobjfun <- function(obj, mf, weights, left, objfun = deviance) {
   ### fit left / right model 
   fmleft <- reweight(obj, weights = weightsleft)
   fmright <- reweight(obj, weights = weightsright)
-
-  return(objfun(fmleft) + objfun(fmright))
+  if(objfun_method == 'sum'){
+    return(objfun(fmleft) + objfun(fmright))
+  }else if ( objfun_method == 'min'){
+    return(min ( objfun(fmleft), objfun(fmright)))
+  }else {
+    return(objfun(fmleft) + objfun(fmright))
+  }
 }
 
 ### determine all possible splits for a factor, both nominal and ordinal

@@ -26,9 +26,14 @@ mobForest_control <- function(ntree = 300, mtry = 0, replace = FALSE,
                               bonferroni = FALSE, minsplit = 20, 
                               trim = 0.1, 
                               objfun = deviance, 
-                              breakties = FALSE, parm = NULL, verbose = FALSE)
+                              breakties = FALSE, parm = NULL, verbose = FALSE, 
+                              objfun_method = 'sum')
 {
-  mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit, trim = trim, objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
+  mob.control = mob_control(alpha = alpha, bonferroni = bonferroni, 
+                            minsplit = minsplit, trim = trim, objfun = objfun, 
+                            breakties = breakties, parm = parm, verbose = verbose, 
+                            objfun_method = objfun_method
+                            )
   class(mob.control) <- "list"
   rval <- new("mobForestControl", 
               ntree = ntree, mtry = mtry, replace = replace, 
@@ -162,7 +167,7 @@ setMethod("getPredictedValues",
         	                     function(tree_id) { #tree_id = '1'
         	                       temp_pred = treePredictions(data_id, 
         	                                                   data = newTestData,
-        	                                                   tree = rf@mf.trees[[tree_id]])
+        	                                                   tree = rf@mf.trees[[tree_id]]@tree)
         	                       return ( c( unlist(temp_pred), 
         	                                   rf@mf.trees.prop[[tree_id]][which(row.names(rf@mf.trees.prop[[tree_id]]) ==temp_pred[['node']]),
         	                                                               c('AdjR2','objFunValue' ) ]

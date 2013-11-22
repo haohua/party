@@ -88,12 +88,16 @@ mob <- function(formula, weights, data = list(), na.action = na.omit,
 }
 
 ## control splitting parameters
+#objfun_method: is to control weather the sum or the min to decide the best splitting point
 mob_control <- function(alpha = 0.05, bonferroni = TRUE, minsplit = 20, trim = 0.1,
-  objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE)
+  objfun = deviance, breakties = FALSE, parm = NULL, verbose = FALSE, 
+                        objfun_method = 'sum')
 {
   rval <- list(alpha = alpha, bonferroni = bonferroni, minsplit = minsplit,
                trim = ifelse(is.null(trim), minsplit, trim),
-               objfun = objfun, breakties = breakties, parm = parm, verbose = verbose)
+               objfun = objfun, breakties = breakties, parm = parm, 
+               verbose = verbose,
+               objfun_method = objfun_method)
   class(rval) <- "mob_control"
   return(rval)
 }
@@ -134,13 +138,14 @@ predict.mob <- function(object, newdata = NULL, type = c("response", "node"), ..
     if(type == "response") {
         pred <- vector(mode = "list", length = nobs)
         for (n in unique(nodeIDs)) {
-            node <- .Call("R_get_nodebynum", object@tree, as.integer(n), PACKAGE = "party")
+            node <- .Call("R_get_nodebynum",
+                          object@tree, as.integer(n), PACKAGE = "party")
             indx <- which(nodeIDs == n)
             # here is where needed to be changed to handle the NA paramters 
-            node$model$predict_response = predict_response_modified
+#             node$model$predict_response = predict_response_modified
             pred[indx] <- predict(node$model, newdata = newinput[indx,,drop = FALSE], ...)
         }
-	rval <- if(isTRUE(all.equal(sapply(pred, length), rep(1, nobs)))) unlist(pred) else pred
+	    rval <- if(isTRUE(all.equal(sapply(pred, length), rep(1, nobs)))) unlist(pred) else pred
     } else {
       rval <- nodeIDs
     }
