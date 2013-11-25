@@ -31,45 +31,45 @@ mob <- function(formula, weights, data = list(), na.action = na.omit,
   where <- integer(length(weights))
   ## the main recursion function
   mob_fit <- function(obj, mf, weights, control) {
-    ### fit a model for the current node
-    obj <- reweight(obj, weights)
-
-    ### set up node (empty if reweighting failed)
-    if(inherits(obj, "try-error")) {
-      node <- list(nodeID = NULL, weights = weights,
-                   criterion = list(statistic = 0, criterion = 0, maxcriterion = 0),
-                   terminal = TRUE, psplit = NULL, ssplits = NULL,
-                   prediction = 0, left = NULL, right = NULL,
-                   sumweights = as.double(sum(weights)), model = obj)
-      class(node) <- "TerminalNodeModel"
-      node$nodeID <- as.integer(nodeid)
+      ### fit a model for the current node
+      obj <- reweight(obj, weights)
+  
+      ### set up node (empty if reweighting failed)
+      if(inherits(obj, "try-error")) {
+        node <- list(nodeID = NULL, weights = weights,
+                     criterion = list(statistic = 0, criterion = 0, maxcriterion = 0),
+                     terminal = TRUE, psplit = NULL, ssplits = NULL,
+                     prediction = 0, left = NULL, right = NULL,
+                     sumweights = as.double(sum(weights)), model = obj)
+        class(node) <- "TerminalNodeModel"
+        node$nodeID <- as.integer(nodeid)
+        where[weights > 0] <<- as.integer(nodeid)
+        nodeid <<- nodeid + 1
+        return(node)
+      }
+      thisnode <- mob_fit_setupnode(obj, mf, weights, control)
+      thisnode$nodeID <- as.integer(nodeid)
       where[weights > 0] <<- as.integer(nodeid)
       nodeid <<- nodeid + 1
-      return(node)
-    }
-    thisnode <- mob_fit_setupnode(obj, mf, weights, control)
-    thisnode$nodeID <- as.integer(nodeid)
-    where[weights > 0] <<- as.integer(nodeid)
-    nodeid <<- nodeid + 1
-    thisnode$model <- obj
-
-    ### split (if appropriate)
-    if(!thisnode$terminal) {
-      ## compute size of (potential) children
-      childweights <- mob_fit_childweights(thisnode, mf, weights)
-
-      ## stop or...
-      if(any(sapply(childweights, sum) == 0)) {
-        thisnode$terminal <- TRUE
-        class(thisnode) <- "TerminalModelNode"
-        return(thisnode)
+      thisnode$model <- obj
+  
+      ### split (if appropriate)
+      if(!thisnode$terminal) {
+        ## compute size of (potential) children
+        childweights <- mob_fit_childweights(thisnode, mf, weights)
+  
+        ## stop or...
+        if(any(sapply(childweights, sum) == 0)) {
+          thisnode$terminal <- TRUE
+          class(thisnode) <- "TerminalModelNode"
+          return(thisnode)
+        }
+        ## ...recall for children
+        thisnode$left <- mob_fit(obj, mf, weights = childweights$left, control)
+        thisnode$right <- mob_fit(obj, mf, weights = childweights$right, control)
       }
-      ## ...recall for children
-      thisnode$left <- mob_fit(obj, mf, weights = childweights$left, control)
-      thisnode$right <- mob_fit(obj, mf, weights = childweights$right, control)
-    }
-    
-    return(thisnode)
+      
+      return(thisnode)
   }
 
   ## recursive partitioning  
@@ -132,7 +132,8 @@ predict.mob <- function(object, newdata = NULL, type = c("response", "node"), ..
     nobs <- NROW(newpart)
     newpart <- initVariableFrame(newpart, trafo = NULL)
     
-    nodeIDs <- .Call("R_get_nodeID", object@tree, newpart, as.double(0.0), PACKAGE = "party")
+    nodeIDs <- .Call("R_get_nodeID", object@tree, newpart, as.double(0.0),
+                     PACKAGE = "party")
 
     type <- match.arg(type)
     if(type == "response") {
