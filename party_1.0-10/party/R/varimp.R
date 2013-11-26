@@ -116,7 +116,8 @@ cutpoints_list <- function(tree, variableID) {
     cutp <- function(node) {
        if (node[[4]]) return(NULL)
        cp <- NULL
-       if (node[[5]][[1]] == variableID)
+       # XXX this part to compare the variableID needs to change to compare by names 
+       if (names(node[[5]][[1]]) == variableID)
            cp <- node[[5]][[3]]
        nl <- cutp(node[[8]])
        nr <- cutp(node[[9]])
@@ -136,12 +137,16 @@ conditional_perm <- function(cond, xnames, input, tree, oob){
 
         ## varID is variable index or column number of input (predictor matrix) 
         ## not variable name!
+        ## xnames are from the formula input, which may be different from the original list
+        ## every thing should be linked to the name, instead of the id
         varID <- which(xnames == cond[i])
 
 
         ## if conditioning variable is not used for splitting in current tree
         ## proceed with next conditioning variable
-        cl <- cutpoints_list(tree, varID)
+        
+        cl <- cutpoints_list(tree, cond[i])
+#         cl <- cutpoints_list(tree, varID)
         if (is.null(cl)) next
 
         ## proceed cutpoints for different types of variables

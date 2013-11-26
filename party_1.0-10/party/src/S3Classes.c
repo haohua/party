@@ -82,7 +82,7 @@ int S3get_nodeterminal(SEXP node) {
 }
 
 SEXP S3get_primarysplit(SEXP node) {
-    return(VECTOR_ELT(node, S3_PSPLIT));
+    return(VECTOR_ELT(node, S3_PSPLIT)); /* the  S3_PSPLIT is an integer which indexes the position of the psplit in the SplittingNode class */
 }
 
 SEXP S3get_surrogatesplits(SEXP node) {

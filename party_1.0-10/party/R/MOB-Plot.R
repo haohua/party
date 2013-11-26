@@ -254,11 +254,11 @@ node_bivplot <- function(mobobj, which = NULL, id = TRUE, pop = TRUE,
           }	  
 	}
   	if(fitmean) {
-	  yfit <- unlist(tapply(yfit, x, mean))
-          grid.lines(seq(along = xlev), yfit, default.units = "native", gp = gpar(col = linecol))
-          grid.points(seq(along = xlev), yfit, default.units = "native",
-	    gp = gpar(col = linecol, cex = pointcex), pch = 19)
-	}
+  	  yfit <- unlist(tapply(yfit, x, mean))
+            grid.lines(seq(along = xlev), yfit, default.units = "native", gp = gpar(col = linecol))
+            grid.points(seq(along = xlev), yfit, default.units = "native",
+  	    gp = gpar(col = linecol, cex = pointcex), pch = 19)
+  	}
         grid.rect(gp = gpar(fill = "transparent"))
         grid.xaxis(at = 1:length(xlev), label = xlev)
         grid.yaxis(at = c(ceiling(yscale[1]), floor(yscale[2])))      
@@ -291,23 +291,28 @@ node_bivplot <- function(mobobj, which = NULL, id = TRUE, pop = TRUE,
       popViewport()
 
       for(i in 1:k) {
-        ## get x and y 
-    	xi <- rep(X[,i], node$weights)
+          ## get x and y 
+      	xi <- rep(X[,i], node$weights)
         o <- ORDER(xi)
         yi <- y[o]
         xi <- xi[o]
-        yfit <- rep(fitted(mobobj), node$weights)[o]
+#         yfit <- rep(fitted(mobobj ), node$weights)[o]
+      	yfit = rep(node$model$fitted.values, node$weights)[o]
+        #XXX this is where to plot the fitted line for each ending node
+        # xxx and this is where to change the prediction part 
+        # but since the node prediction messed up because of the random sampling, 
+        # the fitted function or the prediction response function also messed up. 
+  
+          ## select panel
+      	plot_vpi <- viewport(layout.pos.col = 2, layout.pos.row = i)
+      	pushViewport(plot_vpi)
 
-        ## select panel
-    	plot_vpi <- viewport(layout.pos.col = 2, layout.pos.row = i)
-    	pushViewport(plot_vpi)
-
-    	## call panel function
-    	if(is.factor(xi)) cat_fun(xi, yi, yfit, i, paste("node_mob", node$nodeID, "-", i, sep = ""), ...)
-          else num_fun(xi, yi, yfit, i, paste("node_mob", node$nodeID, "-", i, sep = ""), ...)
-    	if(pop) popViewport() else upViewport()
-      }
-      if(pop) popViewport() else upViewport()
+      	## call panel function
+      	if(is.factor(xi)) cat_fun(xi, yi, yfit, i, paste("node_mob", node$nodeID, "-", i, sep = ""), ...)
+            else num_fun(xi, yi, yfit, i, paste("node_mob", node$nodeID, "-", i, sep = ""), ...)
+      	if(pop) popViewport() else upViewport()
+        }
+        if(pop) popViewport() else upViewport()
     }
     
     return(rval)

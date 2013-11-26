@@ -17,7 +17,10 @@ mob <- function(formula, weights, data = list(), na.action = na.omit,
       ff <- attr(ParseFormula(formula), "formula")
       ff$input[[3]] <- ff$input[[2]]
       ff$input[[2]] <- ff$response[[2]]
-      dpp(model, as.formula(ff$input), other = list(part = as.formula(ff$blocks)), 
+      dpp(model, as.formula(ff$input), 
+          other = list(part = as.formula(ff$blocks)
+                       , part_all = as.formula(ff$blocks)
+                       ), 
           data = data, na.action = na.action)
     }
     formula <- mobpp(formula, data, model)
@@ -125,13 +128,16 @@ predict.mob <- function(object, newdata = NULL, type = c("response", "node"), ..
         newpart <- newdata@get("part")
         newinput <- newdata@get("input")
       } else {
-        newpart <- object@data@get("part", data = newdata)
+        
+        newpart <- object@data@get("part_all", data = newdata)
+#         newpart <- object@data@get("part", data = newdata)
         newinput <- object@data@get("input", data = newdata)
       }
     }
     nobs <- NROW(newpart)
     newpart <- initVariableFrame(newpart, trafo = NULL)
     
+    # nodeIDs get wrong for mob objects in mobForest when sampling with replacement. 
     nodeIDs <- .Call("R_get_nodeID", object@tree, newpart, as.double(0.0),
                      PACKAGE = "party")
 

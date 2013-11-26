@@ -13,114 +13,44 @@ setwd(pack_root)
 set.seed(290875)
 
 # 
-install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
-install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
-install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
-library(ggplot2)
-library(modeltools)
-library(party)
+# install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
+#                   repos = NULL, type = 'source')
+# install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
+#                   repos = NULL, type = 'source')
+# install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
+#                   repos = NULL, type = 'source')
 library(mobForest)
-
 # load test data
-data("BostonHousing", package = "mlbench")
-
-# test for mob 
-BostonHousing$lstat <- log(BostonHousing$lstat)
-BostonHousing$rm <- BostonHousing$rm^2
-BostonHousing$chas <- factor(BostonHousing$chas, levels = 0:1, labels = c("no", "yes"))
-BostonHousing$rad <- factor(BostonHousing$rad, ordered = TRUE)
-objfun_method.list = c( 'min', 'sum')
-correl.obj.list = list(correl = correl.obj
-#                        , correl.obj.x_y = correl.obj.x_y
-#                        , deviance = deviance
-                       )
-fmBH.list = list()
-all.obj = data.frame()
-for ( objfun_method in objfun_method.list){
-  for ( obj in names(correl.obj.list )){
-    
-    fmBH <- mob(medv ~ lstat + rm | zn + indus + chas + nox + age + dis + rad + tax + crim + b + ptratio,
-                control = mob_control(minsplit = 5, 
-                                      objfun = correl.obj.list[[obj]],
-                                      objfun_method = objfun_method,
-                                      verbose = F),
-                data = BostonHousing, model = linearModel)
-    type = paste(objfun_method, obj, sep = '_' )
-    fmBH.list[[type]] = fmBH
-    temp.condition = Condition.SplittingNode(fmBH@tree, objfun=correl.obj.list[[obj]])
-    temp.condition$type = type
-    all.obj = plyr::rbind.fill(temp.condition, all.obj)
-  }
-    
-}
-undebug(predict)
-BostonHousing$node_mob = predict(object= fmBH, newdata=BostonHousing, type = 'node')
-sort(unique(BostonHousing$node_mob))
-sort(party:::terminal_nodeIDs(fmBH@tree))
-debug(predict)
-ggplot(data=all.obj, 
-       mapping=aes(x = nodeID, 
-                y = -objFunValue,
-                col =type )) + 
-  geom_line()
-
 # test for mobForest
 data("BostonHousing", package = "mlbench")
-rfout <-
-  mobForestAnalysis(formula = as.formula(medv ~ lstat),
-                    partitionVariables = c("rad", "tax", "crim"),
-                    mobForest.controls = 
-                      mobForest_control(ntree = 3, mtry = 2, replace = TRUE,
-                                        alpha = 0.05, bonferroni = TRUE,
-                                        objfun = deviance,
-                                        
-                                        # here the correl.obj is embeded in the modeltools, but you may supply your own objfun
-                                       # also the correl.obj is calcualting the negative correlation ( for minimizing)
-                                        minsplit = 25
-#                                         ,objfun_method= 'min'
-                                        ),
-                    data = BostonHousing, 
-                    processors = 3, 
-                    model = linearModel)
-test.nodeID = 9
+ntree = 3
+caltime = system.time({
+  rfout <-
+    mobForestAnalysis(formula = as.formula(medv ~ lstat),
+                      partitionVariables = c("rad", "tax", "crim"),
+                      mobForest.controls = 
+                        mobForest_control(ntree = ntree, mtry = 1, replace = T,
+                                          alpha = 0.05, bonferroni = TRUE,
+                                          objfun = correl.obj,
+                                          
+                                          # here the correl.obj is embeded in the modeltools, but you may supply your own objfun
+                                          # also the correl.obj is calcualting the negative correlation ( for minimizing)
+                                          minsplit = 10
+                                          ,objfun_method= 'min'
+                        ),
+                      data = BostonHousing, 
+                      processors = 3, 
+                      model = linearModel)
+})
+             
+print(caltime/ntree)
 tree_id = '2'
 test.mob = rfout@mf.trees[[tree_id]]
 plot(test.mob )
-# test.weights = test.mob@tree$left$weights
-# # str(test.mob@tree$left$model$ModelEnv@get("designMatrix"))
-# lm.test1 = lm(medv ~  lstat, data = BostonHousing,weights= test.weights)
-# lm.test2 = lm(medv ~ lstat, data = BostonHousing[which(test.weights==1),])
-# test$model$weights == lm.test1$weights
-# str(test$model$ModelEnv@get("designMatrix"))
-# z <- lm.wfit(object@get("designMatrix"),
-#              object@get("responseMatrix"), weights, ...)
-
-
-Condition.SplittingNode(test.mob@tree, objfun=correl.obj)
-# test.model = nodes(test.mob, test.nodeID)[[1]]
-# length(which(test.model$weights>0))
-BostonHousing$node = 
-  predict(object= test.mob,
-          newdata = BostonHousing,#[493,c('lstat',"rad", "tax", "crim")], 
-          type = 'node')
-head(BostonHousing)
-sort(unique(BostonHousing$node))
-# debug(predict)
-# lm.model = lm( medv ~ lstat,
-#                data =BostonHousing[which(BostonHousing$node == test.nodeID),] 
-#                )
 
 pred = getPredictedValues(object=rfout, newdata=T, 
-                          newTestData=BostonHousing)
-rfout@mf.trees.prop[[tree_id]]
-pred$node[1,as.integer(tree_id)]
-BostonHousing[1, ]
-BostonHousing$node[1]
-sort(unique(pred$node[,as.integer(tree_id)]))
-rfout@mf.trees.prop[[1]]
+                          newTestData=BostonHousing[1,])
+                      
 #
 # in the pred result, you may check statistics for each tree, each single node, and some average stat accross the trees
 # documentation is not supplied, please let me know if there is any question. 

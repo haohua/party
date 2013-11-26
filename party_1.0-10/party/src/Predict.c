@@ -208,7 +208,8 @@ SEXP C_get_node(SEXP subtree, SEXP newinputs,
     if (S3is_ordered(split)) {
         cutpoint = REAL(S3get_splitpoint(split))[0];
         x = REAL(get_variable(newinputs, 
-                     S3get_variableID(split)))[numobs];
+                              S3get_variableID(split)
+                              ))[numobs];
         if (x <= cutpoint) {
             return(C_get_node(S3get_leftnode(subtree), 
                               newinputs, mincriterion, numobs, varperm));
@@ -337,11 +338,12 @@ SEXP R_get_nodeID(SEXP tree, SEXP newinputs, SEXP mincriterion) {
     SEXP ans;
     int nobs, i, *dans;
             
-    nobs = get_nobs(newinputs);
+    nobs = get_nobs(newinputs); /* get the nobs for new data inputs */
+    
     PROTECT(ans = allocVector(INTSXP, nobs));
     dans = INTEGER(ans);
     for (i = 0; i < nobs; i++)
-         dans[i] = C_get_nodeID(tree, newinputs, REAL(mincriterion)[0], i);
+         dans[i] = C_get_nodeID(tree, newinputs, REAL(mincriterion)[0], i);/*get node id for each new observation */
     UNPROTECT(1);
     return(ans);
 }

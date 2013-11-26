@@ -106,22 +106,39 @@ Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
 mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(), na.action = na.omit, model = glinearModel, control = mob_control(), ...)
 {	
   # sampling the variables to split
-	formula = formula(paste(mainModel, paste(sample(partitionVars)[1:mtry], collapse=" + "), sep=" | "))	# add	
+	formula = formula(paste(mainModel, 
+                          paste(sample(partitionVars)[1:mtry], collapse=" + "), 
+                          sep=" | "))	# add	
+	formula_all = formula(paste(mainModel, 
+	                        paste(partitionVars, collapse=" + "), 
+	                        sep=" | "))	# add	
+	
 	if (inherits(formula, "formula")) {
-        mobpp <- function(formula, data, model) {
+        mobpp <- function(formula,data, model, formula_all = NULL ) {
             ff <- attr(modeltools:::ParseFormula(formula), "formula")
-			#ff <- attr(ParseFormula(formula), "formula")
+            if( is.null ( formula_all )){
+              ff_all <- ff
+            }else {
+              ff_all <- attr(modeltools:::ParseFormula(formula_all), "formula")
+            }
+            #ff <- attr(ParseFormula(formula), "formula")
             ff$input[[3]] <- ff$input[[2]]
             ff$input[[2]] <- ff$response[[2]]
-            dpp(model, as.formula(ff$input), other = list(part = as.formula(ff$blocks)), data = data, na.action = na.action)
+            dpp(model=model, 
+                as.formula(ff$input), 
+                other = list(part = as.formula(ff$blocks)
+                             ,part_all = as.formula(ff_all$blocks)
+                             ),  # this where to set the partition splitting variable
+                data = data, 
+                na.action = na.action)
         }
-        formula <- mobpp(formula, data, model)
+        formula <- mobpp(formula, data, model,formula_all)
     }
-    if (missing(weights))
-        weights <- rep(1, dimension(formula, "part")[1])
-    fm <- fit(model, formula, ...)
-    where <- integer(length(weights))
-    mob_fit <- function(obj, mf, weights, control) {
+  if (missing(weights))
+      weights <- rep(1, dimension(formula, "part")[1])
+  fm <- fit(model, formula, ...)
+  where <- integer(length(weights))
+  mob_fit <- function(obj, mf, weights, control) {
         obj <- reweight(obj, weights)
         if (inherits(obj, "try-error")) {
             node <- list(nodeID = NULL, weights = weights, criterion = list(statistic = 0, 
@@ -139,7 +156,9 @@ mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(),
         thisnode <- party:::mob_fit_setupnode(obj, mf, weights, control)
         # XXX fixed a bug here to handle special case of terminal node
         if (identical(FALSE, thisnode)) {
-          node <- list(nodeID = NULL, weights = weights,
+          
+          node <- list(nodeID = NULL, 
+                       weights = weights,
                        criterion = list(statistic = 0, 
                                         criterion = 0, 
                                         maxcriterion = 0),
@@ -167,21 +186,28 @@ mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(),
                 class(thisnode) <- "TerminalModelNode"
                 return(thisnode)
             }
-			mf = formula(paste(mainModel, paste(sample(partitionVars)[1:mtry], collapse=" + "), sep=" | "))	# add			
-			mf <- mobpp(mf, data, model) # add
+			mf = formula(paste(mainModel, 
+                         paste(sample(partitionVars)[1:mtry], collapse=" + "), 
+                         sep=" | "))	# add			
+            
+      # XXX here the formula_all is just to add the part_all attributes to the formula, so the variable ID can be consitant 
+			mf <- mobpp(mf, data, model,formula_all) # add
+            
+            
 			thisnode$left <- mob_fit(obj, mf, weights = childweights$left, control)			
-            thisnode$right <- mob_fit(obj, mf, weights = childweights$right, control)
+      thisnode$right <- mob_fit(obj, mf, weights = childweights$right, control)
         }
         return(thisnode)
     }
-    nodeid <- 1
-    tr <- mob_fit(fm, formula, weights = weights, control = control)
-    y <- formula@get("response")
-    yy <- new("VariableFrame", nrow(y), ncol(y))
-    yy@variables <- formula@get("response")
-    rval <- new("mob", tree = tr, responses = yy, data = formula, 
-        where = where)
-    return(rval)
+
+  nodeid <- 1
+  tr <- mob_fit(fm, formula, weights = weights, control = control)
+  y <- formula@get("response")
+  yy <- new("VariableFrame", nrow(y), ncol(y))
+  yy@variables <- formula@get("response")
+  rval <- new("mob", tree = tr, responses = yy, data = formula, 
+      where = where)
+  return(rval)
 }
 
 computeR2 <- function(response, predictions)
@@ -265,6 +291,10 @@ bootstrap <- function(i, data, mainModel, partitionVars, mtry, newTestData, mob.
   # sample the data sets 
   data.subinds = sample(nrow(data), replace = replace)[1:round(fraction*nrow(data))]	
   data.sub = data[data.subinds,]
+  
+#   data.sub$originalIndex = round(as.numeric(rownames(data.sub)))
+#   rownames(data.sub) = c(1:nrow(data.sub))
+  
   fmBH = NULL
   if(model@name == "linear regression model")
     fmBH <- mob_RF_Tree(mainModel = mainModel, 
@@ -609,8 +639,12 @@ mobForestAnalysis <- function(formula, partitionVariables,
   
 	if(mtry == 0) mtry = round(length(partitionVars)/3)	
 	fraction = mobForest.controls@fraction
+  
+  # why the replace == T, sample the whole data sets? 
 	if (mobForest.controls@replace == TRUE) fraction = 1		
 	#library(parallel)
+  
+  
 	cl <- makeCluster(getOption("cl.cores", processors))
 	clusterEvalQ(cl, library(party))
 	clusterExport(cl, c("mob_RF_Tree", "treePredictions", "computeR2", "computeAcc",

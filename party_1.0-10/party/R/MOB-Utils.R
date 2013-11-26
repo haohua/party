@@ -29,8 +29,11 @@ node_classes = function ( node){
 mob_fit_childweights <- function(node, mf, weights) {
 
     partvar <- mf@get("part")
-    xselect <- partvar[[node$psplit$variableID]]
 
+    #  XXX using variable names instead of variable IDs to get the x series 
+    #xselect <- partvar[[node$psplit$]]
+    xselect <- partvar[[which(names(node$psplit$variableID) == names(partvar))]]
+    
     ## we need to coerce ordered factors to numeric
     ## this is what party C code does as well!
 
@@ -74,7 +77,7 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
 
     ### variable selection via fluctuation tests  # by generalized M-fluctutation test
     test <- try(mob_fit_fluctests(obj, mf, minsplit = minsplit, trim = trim,
-      breakties = breakties, parm = parm))
+                                  breakties = breakties, parm = parm))
 
     if (!inherits(test, "try-error")) {
         if(bonferroni) {
@@ -83,7 +86,10 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
           test$pval <- ifelse(!is.na(test$pval) & (test$pval > 0.01), pval2, pval1)
         }
 
+        # XXX here is where to get the best Variable for the splitting 
         best <- test$best
+        
+        
         TERMINAL <- is.na(best) || test$pval[best] > alpha
 
         if (verbose) {
@@ -104,6 +110,7 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
     na_max <- function(x) {
       if(all(is.na(x))) NA else max(x, na.rm = TRUE)
     }
+
     if (TERMINAL) {
         node <- list(nodeID = NULL, weights = weights,
 	             criterion = list(statistic = test$stat, 
@@ -140,8 +147,16 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
       	      cat(paste("\nNo admissable split found in ", sQuote(names(test$stat)[best]), "\n", sep = ""))	    
       	    return(node)
         }
-
-        thissplit$variableID <- best
+        
+        # XXX this is where to set up the variable ID for the psplit. 
+        # Notes: it is very important to keep consitancy in variable IDs during random permuntation process
+        all_variableID_names = names(mf@get('part_all'))
+        
+        all_variableID = c(1 : length(all_variableID_names))
+        names(all_variableID)  = all_variableID_names
+        best_variableID_all = all_variableID[which(names(best) == all_variableID_names )]
+        
+        thissplit$variableID <- best_variableID_all#best
         thissplit$variableName <- names(partvar)[best]
         node <- list(nodeID = NULL, weights = weights, 
                      criterion = list(statistic = test$stat, 
@@ -153,8 +168,8 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
                      sumweights = as.double(sum(weights)))
         class(node) <- "SplittingNode"
     }
-    
-    node$variableID <- best
+    # XXX here is where to set up the variable ID for the splitting node itself
+    node$variableID <- best_variableID_all#best
     if (verbose) {
         cat("\nNode properties:\n")
         print(node$psplit, left = TRUE)
@@ -455,90 +470,90 @@ Condition.TerminalNode <- function(x, n = 1, ...) {
             sep = "", collapse = ""),
       "weights =", sum(x$weights), "\n")
 }
-try(require(plyr))
-get_condition = function (condition, x ){
-  # x should be a psplit class
-  # condition is a data frame 
-  left_condition = condition 
-  right_condition = condition 
-  if( class(x)=="orderedSplit"){
-    max.name = paste(x$variableName, 'LessThan', sep = '_')
-    min.name = paste(x$variableName, 'MoreThan', sep = '_')
-    if ( max.name%in% names( condition)){
-      left_condition[[max.name]] = min(left_condition[[max.name]] , x$splitpoint, na.rm=T)
-      right_condition[[min.name]] = max(right_condition[[min.name]] , x$splitpoint, na.rm=T)
-    }else{
-      left_condition[[max.name]] = x$splitpoint
-      right_condition[[min.name]] = x$splitpoint
-      left_condition[[min.name]] = NA
-      right_condition[[max.name]] = NA
-    }
-  }
-  
-  if( class(x) == "nominalSplit"){
-    levels <- attr(x$splitpoint, "levels")
-    tab <- x$table
-    left_condition[[x$variableName]] <- paste(c(levels[as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
-    right_condition[[ x$variableName]] <-paste(c(levels[!as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
-  }
-  return ( list('left'=left_condition,
-                'right'= right_condition
-  ))
-}
-
-Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
-  # get conditions for splitting node 
-  condition.result = data.frame()
-  if(is.null ( condition)){
-    condition = list()
-  }
-  condition = get_condition(condition,x$psplit )
-  left_condition = condition[['left']]
-  right_condition = condition[['right']]
-  
-  condition.result.left = data.frame()
-  condition.result.right = data.frame()
-  if ( x$left$terminal){
-    objFunValue = 0 
-    if ( !is.null( objfun)){
-      objFunValue = objfun(x$left$model) 
-    }
-    condition.result.left = data.frame(t(sapply(left_condition,c)))
-    condition.result.left$nodeID = x$left$nodeID
-    condition.result.left$objFunValue = objFunValue
-    
-  }else{
-    # pass to left 
-    #     left_condition = rbind( condition, left_condition)
-    
-    condition.result = 
-      rbind.fill( condition.result, 
-                  Condition.SplittingNode (x$left, condition = left_condition, objfun=objfun ) 
-      )
-  }
-  
-  if( x$right$terminal){
-    
-    objFunValue = 0 
-    if ( !is.null( objfun)){
-      objFunValue = objfun(x$right$model)
-    }
-    
-    condition.result.right = data.frame(t(sapply(right_condition,c)))
-    condition.result.right$nodeID = x$right$nodeID
-    condition.result.right$objFunValue = objFunValue
-    #     condition.result.right = data.frame(nodeID = x$right$nodeID, 
-    #                                         path = right_condition, 
-    #                                         objFunValue = objFunValue)
-    condition.result = rbind.fill(condition.result,condition.result.right, condition.result.left  )
-  }else{
-    # pass condition to right 
-    
-    condition.result = 
-      rbind.fill( condition.result,
-                  condition.result.left, 
-                  Condition.SplittingNode (x$right, condition = right_condition, objfun=objfun ) 
-      )
-  }
-  return ( condition.result)
-}
+# try(require(plyr))
+# get_condition = function (condition, x ){
+#   # x should be a psplit class
+#   # condition is a data frame 
+#   left_condition = condition 
+#   right_condition = condition 
+#   if( class(x)=="orderedSplit"){
+#     max.name = paste(x$variableName, 'LessThan', sep = '_')
+#     min.name = paste(x$variableName, 'MoreThan', sep = '_')
+#     if ( max.name%in% names( condition)){
+#       left_condition[[max.name]] = min(left_condition[[max.name]] , x$splitpoint, na.rm=T)
+#       right_condition[[min.name]] = max(right_condition[[min.name]] , x$splitpoint, na.rm=T)
+#     }else{
+#       left_condition[[max.name]] = x$splitpoint
+#       right_condition[[min.name]] = x$splitpoint
+#       left_condition[[min.name]] = NA
+#       right_condition[[max.name]] = NA
+#     }
+#   }
+#   
+#   if( class(x) == "nominalSplit"){
+#     levels <- attr(x$splitpoint, "levels")
+#     tab <- x$table
+#     left_condition[[x$variableName]] <- paste(c(levels[as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+#     right_condition[[ x$variableName]] <-paste(c(levels[!as.logical(x$splitpoint) & (tab > 0)]), collapse=";" )
+#   }
+#   return ( list('left'=left_condition,
+#                 'right'= right_condition
+#   ))
+# }
+# 
+# Condition.SplittingNode <- function(x, condition =NULL, objfun = NULL, ...) {
+#   # get conditions for splitting node 
+#   condition.result = data.frame()
+#   if(is.null ( condition)){
+#     condition = list()
+#   }
+#   condition = get_condition(condition,x$psplit )
+#   left_condition = condition[['left']]
+#   right_condition = condition[['right']]
+#   
+#   condition.result.left = data.frame()
+#   condition.result.right = data.frame()
+#   if ( x$left$terminal){
+#     objFunValue = 0 
+#     if ( !is.null( objfun)){
+#       objFunValue = objfun(x$left$model) 
+#     }
+#     condition.result.left = data.frame(t(sapply(left_condition,c)))
+#     condition.result.left$nodeID = x$left$nodeID
+#     condition.result.left$objFunValue = objFunValue
+#     
+#   }else{
+#     # pass to left 
+#     #     left_condition = rbind( condition, left_condition)
+#     
+#     condition.result = 
+#       rbind.fill( condition.result, 
+#                   Condition.SplittingNode (x$left, condition = left_condition, objfun=objfun ) 
+#       )
+#   }
+#   
+#   if( x$right$terminal){
+#     
+#     objFunValue = 0 
+#     if ( !is.null( objfun)){
+#       objFunValue = objfun(x$right$model)
+#     }
+#     
+#     condition.result.right = data.frame(t(sapply(right_condition,c)))
+#     condition.result.right$nodeID = x$right$nodeID
+#     condition.result.right$objFunValue = objFunValue
+#     #     condition.result.right = data.frame(nodeID = x$right$nodeID, 
+#     #                                         path = right_condition, 
+#     #                                         objFunValue = objFunValue)
+#     condition.result = rbind.fill(condition.result,condition.result.right, condition.result.left  )
+#   }else{
+#     # pass condition to right 
+#     
+#     condition.result = 
+#       rbind.fill( condition.result,
+#                   condition.result.left, 
+#                   Condition.SplittingNode (x$right, condition = right_condition, objfun=objfun ) 
+#       )
+#   }
+#   return ( condition.result)
+# }
