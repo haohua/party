@@ -141,6 +141,7 @@ mob_RF_Tree <- function (mainModel, partitionVars, mtry, weights, data = list(),
   mob_fit <- function(obj, mf, weights, control) {
         obj <- reweight(obj, weights)
         if (inherits(obj, "try-error")) {
+            warning('mob_fit failed in mobForest')
             node <- list(nodeID = NULL, weights = weights, criterion = list(statistic = 0, 
                 criterion = 0, maxcriterion = 0), terminal = TRUE, 
                 psplit = NULL, ssplits = NULL, prediction = 0, 

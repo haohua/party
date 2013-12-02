@@ -12,7 +12,7 @@ if(Sys.info()[['nodename']]=='US-WASH-23C9KQ1'){
 setwd(pack_root)
 set.seed(290875)
 
-# 
+
 # install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
 #                   repos = NULL, type = 'source')
 # install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
@@ -23,7 +23,12 @@ library(mobForest)
 # load test data
 # test for mobForest
 data("BostonHousing", package = "mlbench")
-ntree = 3
+ntree = 10 
+objfun = correl.obj
+# here the correl.obj is embeded in the modeltools, but you may supply your own objfun
+# also the correl.obj is calcualting the negative correlation ( for minimizing)
+objfun_method= 'min' # 'min' or 'sum'
+
 caltime = system.time({
   rfout <-
     mobForestAnalysis(formula = as.formula(medv ~ lstat),
@@ -31,20 +36,18 @@ caltime = system.time({
                       mobForest.controls = 
                         mobForest_control(ntree = ntree, mtry = 1, replace = T,
                                           alpha = 0.05, bonferroni = TRUE,
-                                          objfun = correl.obj,
+                                          objfun = objfun,
                                           
-                                          # here the correl.obj is embeded in the modeltools, but you may supply your own objfun
-                                          # also the correl.obj is calcualting the negative correlation ( for minimizing)
                                           minsplit = 10
-                                          ,objfun_method= 'min'
+                                          ,objfun_method= objfun_method
                         ),
                       data = BostonHousing, 
                       processors = 3, 
                       model = linearModel)
 })
-             
+
 print(caltime/ntree)
-tree_id = '2'
+tree_id = '1'
 test.mob = rfout@mf.trees[[tree_id]]
 plot(test.mob )
 

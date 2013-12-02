@@ -39,6 +39,8 @@ mob <- function(formula, weights, data = list(), na.action = na.omit,
   
       ### set up node (empty if reweighting failed)
       if(inherits(obj, "try-error")) {
+        warning("reweight failed")
+        
         node <- list(nodeID = NULL, weights = weights,
                      criterion = list(statistic = 0, criterion = 0, maxcriterion = 0),
                      terminal = TRUE, psplit = NULL, ssplits = NULL,

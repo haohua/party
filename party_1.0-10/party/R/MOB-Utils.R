@@ -102,6 +102,7 @@ mob_fit_setupnode <- function(obj, mf, weights, control) {
             cat("\n-------------------------------------------\n")    
         }
     } else {
+      warning("mob_fit_fluctests failed")
         TERMINAL <- TRUE
         test <- list(stat = NA, pval = NA)
     }
