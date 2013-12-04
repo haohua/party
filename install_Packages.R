@@ -7,18 +7,21 @@ if(Sys.info()[['nodename']]=='US-WASH-23C9KQ1'){
 }else if(Sys.info()[['nodename']]=='AU-EQUITYPC'){
   pack_root<<-"C:/Source"
 }else if(Sys.info()[['nodename']] %in%  c('ERMUNIQC65',"ERMUNIQC66",'ERMUNIQC85',"ERMUNIQC86")){
-  pack_root <<- "D:/models"
+  pack_root <<- "D:"
 }
 setwd(pack_root)
 set.seed(290875)
 
+install.packages('sandwich')
+install.packages('strucchange')
+install.packages('coin')
+install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
+                  repos = NULL, type = 'source')
+install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
+                  repos = NULL, type = 'source')
+install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
+                  repos = NULL, type = 'source')
 
-# install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
-#                   repos = NULL, type = 'source')
-# install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
-#                   repos = NULL, type = 'source')
-# install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
-#                   repos = NULL, type = 'source')
 library(mobForest)
 # load test data
 # test for mobForest
