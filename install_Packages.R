@@ -12,15 +12,16 @@ if(Sys.info()[['nodename']]=='US-WASH-23C9KQ1'){
 setwd(pack_root)
 set.seed(290875)
 
-install.packages('sandwich')
-install.packages('strucchange')
-install.packages('coin')
+lib.path = .libPaths()[1]  # path where to install the packages e.g "C:/Program Files/R/library" 
+install.packages('sandwich', lib=lib.path)
+install.packages('strucchange', lib=lib.path)
+install.packages('coin', lib=lib.path)
 install.packages( paste( pack_root, '/PARTY/modeltools_0.2-21/modeltools', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
+                  repos = NULL, lib=lib.path, type = 'source')
 install.packages( paste( pack_root, '/PARTY/party_1.0-10/party', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
+                  repos = NULL, lib=lib.path, type = 'source')
 install.packages( paste( pack_root, '/PARTY/mobForest_1.2/mobForest', sep = ''),verbose=T,
-                  repos = NULL, type = 'source')
+                  repos = NULL, lib=lib.path, type = 'source')
 
 library(mobForest)
 # load test data
