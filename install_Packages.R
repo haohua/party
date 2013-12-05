@@ -13,6 +13,8 @@ setwd(pack_root)
 set.seed(290875)
 
 lib.path = .libPaths()[1]  # path where to install the packages e.g "C:/Program Files/R/library" 
+
+#c:\program Files\R\R-3.0.1\bin\x64\R CMD Install -l "C:\Program Files\R\library" c:\..\party
 install.packages('sandwich', lib=lib.path)
 install.packages('strucchange', lib=lib.path)
 install.packages('coin', lib=lib.path)
